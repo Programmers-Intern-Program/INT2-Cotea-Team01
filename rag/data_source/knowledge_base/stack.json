@@ -1,0 +1,20 @@
+{
+  "doc_id": "stack",
+  "category": "stack",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "가장 나중에 넣은 값을 가장 먼저 꺼내는(LIFO) 자료구조를 활용하는 유형이다. 괄호 짝 맞추기, 최근 상태 되돌리기 등에 쓰인다.",
+    "when_to_use": "문제에서 '가장 최근의 것'을 우선적으로 처리해야 하거나, 짝을 이루는 기호를 검사해야 하는 경우에 해당한다.",
+    "java_specific_notes": "Java에서는 `Stack` 클래스보다 `Deque`(예: `ArrayDeque`)를 스택 용도로 쓰는 것이 일반적으로 권장된다. 빈 스택에서 `pop()`을 호출하면 예외가 발생하므로 항상 비어있는지 확인이 필요하다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "규모보다 자료구조 성질(LIFO)이 적합한지가 기준이다. push/pop이 각각 O(1)이라 대규모 N에서도 안전하다."
+}

@@ -1,0 +1,20 @@
+{
+  "doc_id": "greedy_sort_based",
+  "category": "greedy",
+  "subcategory": "greedy_sort_based",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "정렬을 먼저 수행한 뒤, 정렬된 순서대로 그리디하게 선택해나가는 유형이다. 활동 선택 문제(겹치지 않는 구간 최대로 고르기)가 대표적이다.",
+    "when_to_use": "여러 항목 중 일부를 선택해야 하고, 어떤 기준(끝나는 시각, 비율 등)으로 정렬하면 순서대로 선택했을 때 최적이 되는 경우에 해당한다.",
+    "java_specific_notes": "정렬 기준(`Comparator`)을 무엇으로 잡느냐가 정답 여부를 가른다 — 시작 시각이 아니라 끝나는 시각으로 정렬해야 하는 경우처럼, 문제 조건에 맞는 정렬 키를 정확히 골라야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "정렬 비용 O(N log N)을 더해도 시간 제약 안에 들어오는 규모(N ≤ 100만 수준)에서 안전하다."
+}

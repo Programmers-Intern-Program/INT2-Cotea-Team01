@@ -1,0 +1,16 @@
+{
+  "pitfall_id": "index_out_of_bounds",
+  "mistake_description": "반복문이나 substring 등에서 배열/문자열의 실제 길이보다 큰(또는 같은) 인덱스에 접근해 IndexOutOfBoundsException 또는 StringIndexOutOfBoundsException이 발생하는 실수. 대표적으로 반복 조건을 i <= length로 잘못 쓰거나, substring(start, end)의 end가 문자열 길이를 넘는 경우다.",
+  "detection_signal": "반복 조건에 <= length 또는 <= .length()가 사용된 코드, 혹은 substring 호출 시 인덱스 값이 사전에 길이와 비교 검증되지 않는 코드.",
+  "keywords": [
+    "<= arr.length",
+    "<= .length()",
+    "substring("
+  ],
+  "exclusion_keywords": [
+    "< arr.length",
+    "< .length()"
+  ],
+  "keyword_confidence": "low",
+  "confidence_note": "'<= n' 형태는 반복 조건에서 흔히 등장해 오탐 가능성이 있다. 신뢰도 낮음으로 취급 권장."
+}

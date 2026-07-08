@@ -1,0 +1,20 @@
+{
+  "doc_id": "hash_set_general",
+  "category": "hash_set",
+  "subcategory": "hash_set_general",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "특정 값이 존재하는지 여부를 빠르게 판단해야 할 때 쓰는 유형이다. 순차 탐색 대신 해시 기반 자료구조로 조회 시간을 줄이는 것이 핵심이다.",
+    "when_to_use": "'이 값이 이미 나온 적 있는가', '이 값이 다른 집합에 포함되는가'를 반복적으로 확인해야 하는 경우에 해당한다. 단순 존재 여부가 아니라 등장 횟수 비교가 필요하면 `hash_set_frequency`가 더 정확하다.",
+    "java_specific_notes": "`HashSet`/`HashMap`은 순서를 보장하지 않는다. 입력 순서가 결과에 영향을 주는 문제라면 `LinkedHashSet`/`LinkedHashMap`을 고려해야 한다. 객체를 키로 쓸 때는 `equals()`와 `hashCode()`를 함께 오버라이드해야 한다는 점도 유의해야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "N이 최대 10만~100만이어도 O(1) 평균 조회라 안전하다. 다만 해시 충돌이 잦은 극단적 케이스는 예외."
+}

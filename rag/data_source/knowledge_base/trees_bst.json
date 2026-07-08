@@ -1,0 +1,20 @@
+{
+  "doc_id": "trees_bst",
+  "category": "trees",
+  "subcategory": "trees_bst",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "왼쪽 서브트리는 항상 작고 오른쪽 서브트리는 항상 큰, 이진 탐색 트리(BST) 특유의 성질을 활용하는 유형이다.",
+    "when_to_use": "정렬된 순서로 값을 조회/삽입해야 하거나, 특정 값보다 크거나 작은 값을 빠르게 찾아야 하는 경우에 해당한다.",
+    "java_specific_notes": "BST의 중위 순회 결과는 항상 오름차순으로 정렬된다는 성질을 활용하면 별도 정렬 없이 순서를 얻을 수 있다. 삽입/삭제 시 트리가 한쪽으로 치우치면 성능이 저하될 수 있다는 점도 유의해야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "균형이 깨진 BST는 최악의 경우 O(N)까지 저하되므로, N이 크고 삽입 순서가 정렬되어 있으면 위험하다."
+}

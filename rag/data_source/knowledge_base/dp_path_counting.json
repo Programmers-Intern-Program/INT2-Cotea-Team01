@@ -1,0 +1,20 @@
+{
+  "doc_id": "dp_path_counting",
+  "category": "dp",
+  "subcategory": "dp_path_counting",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "격자나 그래프에서 한 지점부터 다른 지점까지 도달하는 경로의 수를 세거나, 경로 중 최적값을 찾는 유형이다.",
+    "when_to_use": "'몇 가지 방법으로 도달할 수 있는가', '이동하며 얻을 수 있는 최댓값/최솟값은 얼마인가'를 묻는 경우에 해당한다.",
+    "java_specific_notes": "격자 문제는 현재 칸의 값이 이전 칸들의 값으로부터 계산되므로, 순회 순서(왼쪽 위에서 오른쪽 아래로 등)를 문제의 이동 규칙과 맞춰야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "격자 크기에 비례하는 상태 공간(R×C)이라, 격자가 수천×수천을 넘으면 메모리도 함께 고려해야 한다."
+}

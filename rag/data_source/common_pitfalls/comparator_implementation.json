@@ -1,0 +1,13 @@
+{
+  "pitfall_id": "comparator_implementation",
+  "mistake_description": "객체를 정렬할 때 Comparable의 compareTo나 Comparator의 compare를 잘못 구현해(예: 반환값 부호를 반대로 쓰거나, 동률 처리를 빠뜨려) 의도한 순서와 다르게 정렬되거나 정렬 자체가 불안정해지는 실수.",
+  "detection_signal": "compareTo( 또는 compare( 메서드를 직접 구현한 코드, 혹은 Comparator.comparing(...)에 정렬 기준을 지정하는 코드.",
+  "keywords": [
+    "compareTo(",
+    "compare(",
+    "Comparator.comparing",
+    "implements Comparable"
+  ],
+  "exclusion_keywords": [],
+  "keyword_confidence": "medium"
+}

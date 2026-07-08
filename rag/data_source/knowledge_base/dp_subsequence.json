@@ -1,0 +1,20 @@
+{
+  "doc_id": "dp_subsequence",
+  "category": "dp",
+  "subcategory": "dp_subsequence",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "원본 수열에서 일부를 제거해 만든 부분수열에 대한 조건(길이, 공통 여부 등)을 찾는 유형이다. 최장 증가 부분 수열(LIS), 최장 공통 부분 수열(LCS) 등이 대표적이다.",
+    "when_to_use": "수열에서 순서를 유지한 채 일부만 골라내는 방식으로 답을 구성해야 하는 경우에 해당한다.",
+    "java_specific_notes": "부분수열 문제는 O(n²) 방식으로 먼저 접근하고, 필요하면 이분 탐색 등으로 최적화하는 순서로 생각하면 접근이 쉬워진다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "O(N²) 방식은 N이 수천 이하일 때 안전하고, N이 10만 이상이면 O(N log N) 최적화(이분 탐색 접목)가 필요하다."
+}

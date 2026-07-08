@@ -1,0 +1,20 @@
+{
+  "doc_id": "dp_general",
+  "category": "dp",
+  "subcategory": "dp_general",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "문제를 더 작은 부분 문제로 나누고, 그 부분 문제의 답을 저장해 재활용하는 유형이다. 핵심은 '상태를 어떻게 정의할 것인가'이다.",
+    "when_to_use": "큰 문제의 답이 작은 문제들의 답으로부터 계산될 수 있고, 같은 작은 문제가 반복해서 등장하는 경우에 해당한다.",
+    "java_specific_notes": "상태를 정의할 배열의 인덱스가 무엇을 의미하는지 먼저 명확히 하는 것이 우선이다. 초기값(base case) 설정을 빠뜨리면 전체 계산이 틀어진다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "상태 개수 × 상태 전이 비용이 시간 제약 안에 들어오는지가 기준이다. 상태 개수가 N²이면 N이 수천 이하일 때 안전하다."
+}

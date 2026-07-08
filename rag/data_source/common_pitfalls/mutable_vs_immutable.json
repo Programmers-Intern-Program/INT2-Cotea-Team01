@@ -1,0 +1,15 @@
+{
+  "pitfall_id": "mutable_vs_immutable",
+  "mistake_description": "String이 불변 객체라는 점을 모르고 반복문 안에서 `+` 연산으로 문자열을 계속 이어붙여 성능이 저하되는 실수.",
+  "detection_signal": "반복문 내부에서 String 변수에 `+=` 또는 `+` 연산으로 값을 누적하는 코드. 반복 횟수가 많을 것으로 예상되면 StringBuilder로 교체가 필요하다.",
+  "keywords": [
+    "String ",
+    "+= ",
+    "+ \""
+  ],
+  "exclusion_keywords": [
+    "StringBuilder",
+    "StringBuffer"
+  ],
+  "keyword_confidence": "medium"
+}

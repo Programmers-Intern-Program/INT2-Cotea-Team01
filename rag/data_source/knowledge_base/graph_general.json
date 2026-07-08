@@ -1,0 +1,20 @@
+{
+  "doc_id": "graph_general",
+  "category": "graph_traversal",
+  "subcategory": "graph_general",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "정점과 간선으로 이루어진 구조를 인접 리스트나 인접 행렬로 표현하고 다루는 기본 유형이다. 어떻게 표현할지 자체가 첫 번째 결정 사항이다.",
+    "when_to_use": "노드 간의 연결 관계가 문제에 주어지고, 이 연결을 따라 이동하거나 정보를 전파해야 하는 경우에 해당한다. 구체적인 순회 방식이 필요하면 `bfs`/`dfs`를, 연결 여부 판별이 핵심이면 `graph_connectivity`를 고려해야 한다.",
+    "java_specific_notes": "정점 수가 많고 간선이 적으면 인접 리스트(`List<List<Integer>>` 또는 `ArrayList[]`)가, 간선이 많으면 인접 행렬(`boolean[][]`)이 유리하다. 방향 그래프인지 무방향 그래프인지에 따라 간선을 한 번만 추가할지 양방향으로 추가할지 달라진다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "정점 V, 간선 E일 때 인접 리스트 기준 O(V+E). V, E가 각각 10만 이하면 안전, 그 이상이면 자료구조 선택(행렬 대신 리스트)이 중요해진다."
+}

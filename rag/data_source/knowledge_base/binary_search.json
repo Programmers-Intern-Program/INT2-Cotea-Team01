@@ -1,0 +1,20 @@
+{
+  "doc_id": "binary_search",
+  "category": "binary_search",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "정렬된 데이터에서 절반씩 범위를 좁혀가며 원하는 값을 찾는 유형이다.",
+    "when_to_use": "데이터가 정렬되어 있고, 특정 조건을 만족하는 경계값을 찾아야 하는 경우에 해당한다. 값 자체를 찾는 것뿐 아니라 '어떤 조건을 만족하는 최소/최대값'을 찾는 매개변수 탐색 형태로도 쓰인다.",
+    "java_specific_notes": "탐색 범위(`left`, `right`)의 갱신 방식과 반복 종료 조건(`left <= right` vs `left < right`)을 정확히 맞추지 않으면 무한 루프나 경계값 누락이 발생한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "O(log N)이라 N이 아무리 커도(수억 이상) 안전하다. 다만 정렬 전제가 깨지면 규모와 무관하게 결과가 틀린다."
+}

@@ -1,0 +1,20 @@
+{
+  "doc_id": "queue_deque",
+  "category": "queue_deque",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "먼저 넣은 값을 먼저 꺼내는(FIFO) 큐, 혹은 양쪽 끝에서 삽입/삭제가 가능한 덱을 활용하는 유형이다.",
+    "when_to_use": "처리 순서가 들어온 순서와 같아야 하거나(큐), 양쪽 끝 모두에서 값을 넣고 빼야 하는 경우(덱)에 해당한다. 너비 우선 탐색(BFS)의 핵심 도구이기도 하다.",
+    "java_specific_notes": "`ArrayDeque`가 `LinkedList`보다 일반적으로 성능이 좋아 큐/덱 용도로 권장된다. `poll()`은 빈 경우 null을 반환하고 `remove()`는 예외를 던진다는 차이를 알아둬야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "stack과 동일하게 삽입/삭제가 O(1)이라 대규모 N에서도 안전하다."
+}

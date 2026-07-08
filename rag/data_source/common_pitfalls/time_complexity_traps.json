@@ -1,0 +1,14 @@
+{
+  "pitfall_id": "time_complexity_traps",
+  "mistake_description": "입력 크기에 비해 시간복잡도가 과도하게 높은 접근을 선택해 시간초과가 발생하는 실수. 예: N이 10만인데 O(N²) 이중 반복문을 사용하는 경우.",
+  "detection_signal": "중첩 반복문의 깊이와 각 반복 범위가 문제의 제약 조건(N의 최대값)과 비교했을 때 감당 가능한 수준인지 확인. 대략 N ≤ 1,000이면 O(N²)까지, N ≤ 100,000이면 O(N log N) 이하가 안전한 기준.",
+  "keywords": [
+    "for (",
+    "for(",
+    "while (",
+    "while("
+  ],
+  "exclusion_keywords": [],
+  "keyword_confidence": "low",
+  "confidence_note": "반복문 자체는 정상 코드에도 항상 있어, 이 keywords만으로는 사실상 걸러지는 게 없다. 실제로는 중첩 깊이 등 정적 분석이 필요해 키워드 매칭으로 정밀 판별이 불가능하다. 백엔드는 이 항목의 매칭 결과를 신뢰도 낮음으로 취급해야 한다."
+}

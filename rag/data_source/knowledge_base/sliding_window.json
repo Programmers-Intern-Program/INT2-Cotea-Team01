@@ -1,0 +1,20 @@
+{
+  "doc_id": "sliding_window",
+  "category": "sliding_window",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "일정한 크기 또는 가변 크기의 구간(윈도우)을 이동시키며 조건을 확인하는 유형이다.",
+    "when_to_use": "'연속된 부분 구간' 중에서 조건을 만족하는 것을 찾아야 하는 경우에 해당한다. 매번 구간을 처음부터 다시 계산하지 않고, 이전 계산 결과를 재활용할 수 있는지가 핵심이다.",
+    "java_specific_notes": "윈도우가 오른쪽으로 확장될 때 새로 들어오는 값을 더하고, 왼쪽이 줄어들 때 빠지는 값을 빼는 방식으로 구현하면 매번 전체를 다시 계산하지 않아도 된다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "O(N)이라 N이 수백만이어도 안전하다."
+}

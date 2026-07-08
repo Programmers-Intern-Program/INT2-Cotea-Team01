@@ -1,0 +1,20 @@
+{
+  "doc_id": "priority_queue",
+  "category": "priority_queue",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "항상 가장 크거나 가장 작은 값을 빠르게 꺼낼 수 있는 자료구조를 활용하는 유형이다.",
+    "when_to_use": "매번 전체를 정렬하지 않고도 최댓값/최솟값을 반복적으로 꺼내야 하는 경우에 해당한다.",
+    "java_specific_notes": "Java의 `PriorityQueue`는 기본적으로 최소 힙이다. 최대 힙이 필요하면 `Collections.reverseOrder()`나 커스텀 `Comparator`를 넘겨야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "삽입/삭제가 O(log N)이라, N이 수십만이어도 안전하다."
+}

@@ -1,0 +1,20 @@
+{
+  "doc_id": "two_pointer",
+  "category": "two_pointer",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "정렬된 배열이나 수열에서 두 개의 포인터(인덱스)를 이동시키며 조건을 만족하는 지점을 찾는 유형이다.",
+    "when_to_use": "정렬된 데이터에서 두 값의 합/차가 특정 조건을 만족하는 쌍을 찾거나, 두 배열을 동시에 비교해나가야 하는 경우에 해당한다.",
+    "java_specific_notes": "두 포인터가 서로를 지나치지 않도록 이동 조건을 정확히 세워야 한다. 어느 포인터를 언제 이동시킬지의 기준이 문제 조건과 일치하는지 확인이 필요하다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "O(N)이라 N이 수백만이어도 안전하다. 정렬 전제가 있는 경우 정렬 비용 O(N log N)이 추가된다."
+}

@@ -1,0 +1,20 @@
+{
+  "doc_id": "hash_set_frequency",
+  "category": "hash_set",
+  "subcategory": "hash_set_frequency",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "값의 존재 여부가 아니라 등장 횟수 자체를 세고 비교해야 하는 유형이다. 두 집합을 비교할 때 단순 포함 여부만으로는 부족하고 개수까지 맞아야 하는 경우를 가리킨다.",
+    "when_to_use": "동일한 값이 여러 번 나타날 수 있는 상황에서, '몇 개가 남는지' 혹은 '개수가 다른 지점'을 찾아야 하는 경우에 해당한다. 단순 집합 연산(교집합/차집합)만으로 접근하면 중복 값 처리에서 틀리기 쉽다.",
+    "java_specific_notes": "`HashMap<String, Integer>`에 `merge(key, 1, Integer::sum)` 또는 `getOrDefault(key, 0) + 1` 패턴으로 카운팅하는 것이 일반적이다. 카운트를 차감할 때 0 이하로 내려가는 경우를 어떻게 처리할지 문제 조건에 맞게 판단해야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "hash_set_general과 동일하게 대규모 N에서도 안전하다."
+}

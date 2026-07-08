@@ -1,0 +1,20 @@
+{
+  "doc_id": "bruteforcing",
+  "category": "bruteforcing",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "가능한 모든 경우의 수를 빠짐없이 확인하는 유형이다. 별도의 최적화 없이 전체를 다 시도해도 시간 제약 안에 들어오는 경우에 적합하다.",
+    "when_to_use": "입력 크기가 충분히 작아서 모든 조합/순열을 확인해도 시간 내에 계산이 끝나는 경우에 해당한다.",
+    "java_specific_notes": "중첩 반복문이나 재귀로 모든 경우를 만들 때, 실제로 모든 경우가 빠짐없이 생성되는지 작은 예시로 먼저 검증해보는 것이 좋다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "N이 20 이하(2^N 조합) 또는 N이 수백 이하(N² 이하)일 때만 안전하다. N이 1000을 넘으면 대부분 시간초과 위험이 크다."
+}

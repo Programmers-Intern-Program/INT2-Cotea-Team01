@@ -1,0 +1,20 @@
+{
+  "doc_id": "trees_general",
+  "category": "trees",
+  "subcategory": "trees_general",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "부모-자식 관계로 연결된 노드 구조를 순회하거나 값을 집계하는 기본 유형이다. 전위/중위/후위 순회, 레벨 순서 순회 등 트리를 탐색하는 방식 자체가 핵심이다.",
+    "when_to_use": "문제에서 계층적 구조(폴더-파일, 조직도 등)가 명시적으로 주어지거나, 순회 순서 자체가 답에 영향을 주는 경우에 해당한다.",
+    "java_specific_notes": "재귀로 순회를 구현할 때 종료 조건(리프 노드 또는 null 자식)을 빠뜨리면 StackOverflowError가 발생할 수 있다. 트리 깊이가 클 수 있는 문제라면 재귀 대신 반복(스택 활용)을 고려해야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "트리 깊이가 N에 비례할 수 있는 경우(편향 트리) 재귀 깊이 문제를 별도로 고려해야 한다."
+}

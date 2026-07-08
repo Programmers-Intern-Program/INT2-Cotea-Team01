@@ -1,0 +1,40 @@
+# --- Spring Boot (backend) ---
+backend/target/
+backend/build/
+backend/.gradle/
+backend/.mvn/
+!backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+application-local.yml
+application-local.properties
+application-secret.yml
+
+# --- Chrome Extension (extension) ---
+extension/node_modules/
+extension/dist/
+
+# --- Python (rag) ---
+rag/__pycache__/
+rag/**/__pycache__/
+*.pyc
+rag/venv/
+rag/.venv/
+rag/.ipynb_checkpoints/
+
+# --- rag ---
+rag/.env
+rag/scripts/chroma_db/
+rag/problems/*.json
+
+# --- Secrets / env ---
+.env
+*.pem
+credentials.json
+gemini-api-key*
+
+# --- IDE / OS ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db

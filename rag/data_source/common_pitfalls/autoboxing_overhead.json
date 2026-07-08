@@ -1,0 +1,15 @@
+{
+  "pitfall_id": "autoboxing_overhead",
+  "mistake_description": "Integer, Long 같은 래퍼 클래스를 원시 타입(int, long) 대신 반복적으로 사용해, 오토박싱/언박싱 비용과 추가 객체 생성으로 인한 성능 저하가 발생하는 실수. 특히 대량의 데이터를 다루는 컬렉션(List<Integer> 등)에서 반복 연산이 많을 때 체감되는 성능 차이가 커진다.",
+  "detection_signal": "List<Integer>, List<Long> 등 래퍼 타입 컬렉션에 대해 대량 반복 연산(정렬, 합계 계산 등)을 수행하는 코드. 원시 타입 배열(int[])로 대체 가능한 상황인지 확인이 필요하다.",
+  "keywords": [
+    "List<Integer>",
+    "List<Long>",
+    "ArrayList<Integer>"
+  ],
+  "exclusion_keywords": [
+    "int[]",
+    "long[]"
+  ],
+  "keyword_confidence": "medium"
+}

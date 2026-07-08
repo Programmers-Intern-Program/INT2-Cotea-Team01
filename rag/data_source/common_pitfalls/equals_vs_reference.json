@@ -1,0 +1,14 @@
+{
+  "pitfall_id": "equals_vs_reference",
+  "mistake_description": "String이나 Wrapper 클래스(Integer 등)를 `==`로 비교해 값이 같아도 다르다고 판단되는 실수.",
+  "detection_signal": "`String`, `Integer`, `Long` 등의 객체를 `==`로 비교하는 코드. 값 비교가 목적이라면 `.equals()`를 사용해야 한다.",
+  "keywords": [
+    "==",
+    "!="
+  ],
+  "exclusion_keywords": [
+    "equals(",
+    ".equals"
+  ],
+  "keyword_confidence": "medium"
+}

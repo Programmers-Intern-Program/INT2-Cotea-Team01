@@ -1,0 +1,20 @@
+{
+  "doc_id": "string_pattern_basic",
+  "category": "string",
+  "subcategory": "string_pattern_basic",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "한 문자열 안에서 특정 부분 문자열이나 패턴이 존재하는지, 몇 번 등장하는지를 찾는 유형이다. KMP 같은 고급 문자열 알고리즘이 아니라, 단순 포함 검사 수준을 가리킨다.",
+    "when_to_use": "문제가 '특정 문자열이 포함되어 있는가', '부분 문자열이 몇 번 등장하는가'를 묻고, 입력 크기가 크지 않아 단순 탐색으로 충분한 경우에 해당한다.",
+    "java_specific_notes": "`String.contains()`, `indexOf()` 등 내장 메서드로 충분한 경우가 많다. 대소문자 구분 여부를 문제 조건에서 놓치지 않아야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "단순 포함 검색은 문자열 길이 N, 패턴 길이 M일 때 O(N*M)이라 N, M이 각각 수천 이하일 때 안전하다. 그 이상이면 고급 문자열 알고리즘이 필요할 수 있다."
+}

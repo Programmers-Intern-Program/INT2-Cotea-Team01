@@ -1,0 +1,20 @@
+{
+  "doc_id": "string_general",
+  "category": "string",
+  "subcategory": "string_general",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "문자열을 순회하거나 조작하는 기본 유형이다. 문자 단위 접근, 부분 문자열 추출, 문자열 결합 등 문자열 자체의 성질(불변성 등)을 다루는 것이 핵심이다.",
+    "when_to_use": "문제가 문자열의 특정 문자를 검사하거나, 문자열을 분해/재조합해야 하는 경우에 해당한다. 정해진 패턴이 존재하는지 찾는 문제라면 `string_pattern_basic`을 함께 고려해야 한다.",
+    "java_specific_notes": "Java의 String은 불변(immutable) 객체라, 반복문 안에서 `+` 연산으로 문자열을 계속 이어붙이면 매번 새 객체가 생성되어 비효율적이다. 반복적인 결합이 필요하면 StringBuilder 사용을 고려해야 한다. 문자 단위 비교 시 `char`와 `String`을 혼동하지 않아야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "문자열 길이와 반복 횟수의 곱이 커지는 경우(예: 반복문 안에서 문자열 연결) 주의가 필요하다. 문자열 길이가 수만 이상이면 StringBuilder 없이는 위험하다."
+}

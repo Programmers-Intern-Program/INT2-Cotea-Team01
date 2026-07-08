@@ -1,0 +1,20 @@
+{
+  "doc_id": "simulation_grid",
+  "category": "simulation",
+  "subcategory": "simulation_grid",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "2차원 격자(보드) 위에서 이동, 회전, 확산 등의 규칙을 적용하는 시뮬레이션 유형이다.",
+    "when_to_use": "문제가 격자/보드 형태의 공간을 주고, 그 위에서 정해진 규칙에 따라 상태가 바뀌는 과정을 묻는 경우에 해당한다.",
+    "java_specific_notes": "상하좌우 이동은 방향 벡터 배열(`int[] dx, dy`)로 관리하면 코드가 단순해진다. 격자 경계를 벗어나는지 매번 확인해야 하며, 회전 로직은 좌표 변환 공식을 정확히 세워야 한다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "격자 크기 R×C와 반복 횟수의 곱이 기준이다. 격자가 크고(수백×수백) 반복도 많으면 O(R*C*턴수)가 위험할 수 있다."
+}

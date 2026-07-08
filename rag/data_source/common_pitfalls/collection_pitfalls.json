@@ -1,0 +1,15 @@
+{
+  "pitfall_id": "collection_pitfalls",
+  "mistake_description": "HashMap에서 존재하지 않는 키를 조회했을 때 null이 반환되는 것을 고려하지 않고 바로 사용해 NullPointerException이 발생하는 실수. 또는 반복 중인 컬렉션을 직접 수정해 ConcurrentModificationException이 발생하는 실수.",
+  "detection_signal": "`map.get(key)`의 결과를 null 체크 없이 바로 연산에 사용하는 코드. `for-each` 반복문 안에서 해당 컬렉션에 `add()`/`remove()`를 직접 호출하는 코드.",
+  "keywords": [
+    ".get(",
+    "Map<",
+    "HashMap<"
+  ],
+  "exclusion_keywords": [
+    "getOrDefault",
+    "containsKey"
+  ],
+  "keyword_confidence": "medium"
+}

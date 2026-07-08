@@ -1,0 +1,33 @@
+{
+  "_comment": "field(용도) -> 관련 힌트 레벨 매핑. 레벨 체계가 바뀌면 이 파일만 수정하면 되고, knowledge_base_chunks.json / common_pitfalls_chunks.json은 건드릴 필요 없다. 검색 시 이 매핑은 하드 필터가 아니라 순위 가산점(soft boost)으로만 쓴다 — 안전 규칙은 hintLevelPolicy.allow/forbid가 별도로 담당하므로, 레벨이 안 맞는 문서가 후보에 남아도 위험하지 않다.",
+
+  "knowledge_base": {
+    "definition": {
+      "purpose": "개념이 무엇인지 소개",
+      "related_levels": [2]
+    },
+    "when_to_use": {
+      "purpose": "언제 이 접근을 쓰는지 판단 기준",
+      "related_levels": [2, 3]
+    },
+    "java_specific_notes": {
+      "purpose": "구현/자바 특화 실무 팁",
+      "related_levels": [3, 4]
+    },
+    "applicable_scale": {
+      "purpose": "이 접근이 통하는/안 통하는 입력 규모 기준 — '명백히 잘못된 접근' 예외 판단의 근거",
+      "related_levels": [2, 4]
+    }
+  },
+
+  "common_pitfalls": {
+    "mistake_description": {
+      "purpose": "실수 패턴 설명",
+      "related_levels": [4]
+    },
+    "detection_signal": {
+      "purpose": "코드에서 이 실수를 감지하는 신호",
+      "related_levels": [4]
+    }
+  }
+}

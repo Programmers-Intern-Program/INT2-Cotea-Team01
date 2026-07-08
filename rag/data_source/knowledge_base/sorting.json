@@ -1,0 +1,20 @@
+{
+  "doc_id": "sorting",
+  "category": "sorting",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "주어진 데이터를 특정 기준으로 순서대로 나열하는 유형이다. 정렬 자체가 목적이 아니라, 정렬 이후의 처리를 쉽게 만들기 위한 준비 단계로 쓰이는 경우가 많다.",
+    "when_to_use": "값의 순서나 크기 비교가 반복적으로 필요하거나, 정렬된 상태를 전제로 한 다른 알고리즘(이분 탐색, 투 포인터 등)을 쓰기 전 단계에 해당한다.",
+    "java_specific_notes": "`Arrays.sort()`(기본 타입)와 `Collections.sort()`(객체)의 차이, `Comparator.comparing()`으로 다중 기준 정렬을 구성하는 방법을 알아둘 필요가 있다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "표준 정렬은 O(N log N)이라 N이 수백만이어도 대체로 안전하다. N²로 직접 정렬을 구현하면 N이 수천을 넘는 순간 위험하다."
+}

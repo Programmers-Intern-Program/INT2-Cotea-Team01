@@ -1,0 +1,20 @@
+{
+  "doc_id": "greedy_general",
+  "category": "greedy",
+  "subcategory": "greedy_general",
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "매 단계에서 지금 당장 가장 좋아 보이는 선택을 반복해서 전체 답을 구성하는 유형이다. 이 선택이 항상 최종 답으로 이어진다는 것이 문제 구조상 보장되어야 한다.",
+    "when_to_use": "'가장 큰/작은 것부터 처리하면 항상 최적이 되는가'를 판단할 수 있는 경우에 해당한다. 이 보장이 없는 문제에 그리디를 적용하면 틀린 답이 나올 수 있다.",
+    "java_specific_notes": "그리디로 접근하기 전에 반례가 없는지 스스로 의심해보는 습관이 필요하다. '항상 맞는 것 같다'는 직관만으로 구현하면 특정 케이스에서 틀릴 수 있다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "규모보다 '그리디 선택이 최적임을 증명할 수 있는가'가 기준이다. 증명 없이 규모만 보고 그리디를 택하면 안 된다."
+}
