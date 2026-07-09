@@ -9,10 +9,6 @@ application-local.yml
 application-local.properties
 application-secret.yml
 
-# --- Chrome Extension (extension) ---
-extension/node_modules/
-extension/dist/
-
 # --- Python (rag) ---
 rag/__pycache__/
 rag/**/__pycache__/
@@ -40,3 +36,6 @@ claude-api-key*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# --- Claude Code ---
+CLAUDE.md
