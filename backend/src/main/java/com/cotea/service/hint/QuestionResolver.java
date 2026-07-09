@@ -1,6 +1,7 @@
 package com.cotea.service.hint;
 
 import com.cotea.controller.dto.HintRequest;
+import com.cotea.exception.CoteaException;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +23,15 @@ public class QuestionResolver {
         if ("FREE_TEXT".equals(request.getQuestionType())) {
             return request.getQuestionText() == null ? "" : request.getQuestionText().trim();
         }
-        return BUTTON_QUESTIONS.getOrDefault(request.getButtonId(), "힌트를 주세요");
+        String question = BUTTON_QUESTIONS.get(request.getButtonId());
+        if (question == null) {
+            throw new CoteaException("INVALID_BUTTON_ID", "buttonId 값이 올바르지 않습니다.", 400);
+        }
+        return question;
+    }
+
+    public boolean supportsButtonId(String buttonId) {
+        return BUTTON_QUESTIONS.containsKey(buttonId);
     }
 
     public boolean userAsksReason(String question) {
