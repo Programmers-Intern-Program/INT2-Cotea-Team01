@@ -9,16 +9,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "cotea")
 public class CoteaProperties {
 
-    private final Gemini gemini = new Gemini();
+    private final Claude claude = new Claude();
     private final ProblemMeta problemMeta = new ProblemMeta();
     private final Rag rag = new Rag();
 
     @Getter
     @Setter
-    public static class Gemini {
+    public static class Claude {
         private String apiKey;
-        private String model = "gemini-2.5-flash";
-        private String baseUrl = "https://generativelanguage.googleapis.com/v1beta";
+        private String model = "claude-sonnet-4-6";
+        private int maxTokens = 1024;
+        private String baseUrl = "https://api.anthropic.com";
     }
 
     @Getter

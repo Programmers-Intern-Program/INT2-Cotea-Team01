@@ -1,6 +1,6 @@
 package com.cotea.service.hint;
 
-import com.cotea.client.GeminiClient;
+import com.cotea.client.LlmClient;
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.controller.dto.HintResponse;
 import com.cotea.exception.CoteaException;
@@ -25,7 +25,7 @@ public class HintService {
     private final ProblemContextSelector problemContextSelector;
     private final PromptAssembler promptAssembler;
     private final RagRetrievalService ragRetrievalService;
-    private final GeminiClient geminiClient;
+    private final LlmClient llmClient;
     private final QuestionResolver questionResolver;
 
     public HintResponse generate(HintRequest request) {
@@ -64,7 +64,7 @@ public class HintService {
                     .build();
         }
 
-        String responseText = geminiClient.generate(
+        String responseText = llmClient.generate(
                 systemPrompt,
                 request.getConversationHistory(),
                 userMessage

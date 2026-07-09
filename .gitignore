@@ -31,6 +31,8 @@ rag/problems/*.json
 *.pem
 credentials.json
 gemini-api-key*
+anthropic-api-key*
+claude-api-key*
 
 # --- IDE / OS ---
 .idea/

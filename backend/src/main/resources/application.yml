@@ -6,10 +6,11 @@ spring:
     name: cotea-backend
 
 cotea:
-  gemini:
-    api-key: ${GEMINI_API_KEY:}
-    model: gemini-2.5-flash
-    base-url: https://generativelanguage.googleapis.com/v1beta
+  claude:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${ANTHROPIC_MODEL:claude-sonnet-4-6}
+    max-tokens: ${ANTHROPIC_MAX_TOKENS:1024}
+    base-url: https://api.anthropic.com
   problem-meta:
     # 로컬: ../rag/problems/{problemId}.json
     directory: ${COTEA_PROBLEM_META_DIR:../rag/problems}

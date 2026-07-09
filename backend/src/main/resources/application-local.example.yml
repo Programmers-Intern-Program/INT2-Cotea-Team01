@@ -1,0 +1,9 @@
+# 로컬 전용 설정 예시 — 복사 후 application-local.yml 로 저장 (gitignore)
+# 실행: ./gradlew bootRun  (bootRun은 local 프로파일 자동 적용)
+
+cotea:
+  claude:
+    api-key: sk-ant-api03-여기에_본인_키
+    # model: claude-sonnet-4-6  # 선택
+  problem-meta:
+    directory: ../rag/problems

@@ -31,3 +31,8 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// 로컬 개발: ./gradlew bootRun 만으로 application-local.yml 자동 로드
+tasks.named('bootRun') {
+    systemProperty 'spring.profiles.active', 'local'
+}
