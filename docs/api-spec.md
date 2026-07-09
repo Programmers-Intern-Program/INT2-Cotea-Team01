@@ -121,6 +121,13 @@
 
 - `400 MISSING_PROBLEM_ID` — problemId 누락
 - `400 INVALID_STAGE` — stage 값 오류
+- `400 INVALID_HINT_LEVEL` — hintLevel이 1~4 범위를 벗어남
+- `400 INVALID_QUESTION_TYPE` — questionType 값 오류
+- `400 MISSING_BUTTON_ID` — `questionType=BUTTON`인데 buttonId 누락
+- `400 INVALID_BUTTON_ID` — buttonId 값 오류 또는 현재 stage에서 사용할 수 없는 buttonId
+- `400 MISSING_QUESTION_TEXT` — `questionType=FREE_TEXT`인데 questionText 누락
+- `400 MISSING_SUBMISSION_RESULT` — `stage=WRONG_ANSWER`인데 submissionResult 누락
+- `400 INVALID_SUBMISSION_RESULT` — submissionResult 값 오류 또는 오답 원인 버튼과 submissionResult 불일치
 - `500 AI_SERVICE_ERROR` — AI 응답 생성 실패 (Claude API 오류 등)
 
 ---
