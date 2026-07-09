@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "코티 - Cotea",
+  "version": "1.0",
+  "icons": {
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "permissions": ["storage", "sidePanel", "tabs"],
+  "host_permissions": [
+    "https://school.programmers.co.kr/*",
+    "http://localhost/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://school.programmers.co.kr/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "코티 열기",
+    "default_icon": {
+      "16": "icon.png",
+      "32": "icon.png"
+    }
+  }
+}
