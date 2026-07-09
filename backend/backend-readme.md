@@ -1,6 +1,6 @@
 # Cotea Backend (Spring Boot)
 
-`/api/hint` 힌트 API 서버입니다. 문제 메타 + prompt-policy + Gemini로 힌트를 생성합니다.
+`/api/hint` 힌트 API 서버입니다. 문제 메타 + prompt-policy + Claude로 힌트를 생성합니다.
 
 ## 실행
 
@@ -10,12 +10,17 @@ cd backend
 # 문제 메타 준비 (gitignore)
 cp ../rag/problems/1829.json ../rag/problems/1829.json  # 이미 있으면 생략
 
-export GEMINI_API_KEY=your_key
+export ANTHROPIC_API_KEY=your_key
+
 # 선택: 문제 메타 경로 (기본 ../rag/problems)
 export COTEA_PROBLEM_META_DIR=../rag/problems
 
+# application-local.example.yml 참고 → application-local.yml 생성 (API Key 등)
 ./gradlew bootRun
 ```
+
+`bootRun`은 기본으로 `local` 프로파일을 사용합니다 (`application-local.yml` 자동 로드).  
+배포용 jar 실행 시에는 프로파일을 따로 지정하세요.
 
 ## API
 
@@ -48,8 +53,16 @@ com.cotea
 ├── service/problem/ProblemMetaService.java
 ├── service/policy/PromptPolicyLoader.java
 ├── service/rag/RagRetrievalService.java  # 인터페이스 (MVP: NoOp)
-└── client/GeminiClient.java
+└── client/
+    ├── LlmClient.java
+    └── ClaudeClient.java
 ```
+
+## LLM
+
+| 환경변수 | 기본 모델 |
+|----------|-----------|
+| `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` |
 
 ## RAG
 

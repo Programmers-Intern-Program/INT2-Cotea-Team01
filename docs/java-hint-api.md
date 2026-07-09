@@ -7,7 +7,7 @@
 
 ## 1. 개요
 
-코티(Cotea) 힌트 API는 **문제별 메타데이터(A층) + 공통 prompt-policy + Gemini**를 조합해  
+코티(Cotea) 힌트 API는 **문제별 메타데이터(A층) + 공통 prompt-policy + Claude**를 조합해  
 정답 코드 없이 **방향성 힌트**를 생성합니다.
 
 | 항목 | 내용 |
@@ -15,7 +15,7 @@
 | 엔드포인트 | `POST /api/hint` |
 | API 명세 | [`api-spec.md`](./api-spec.md) |
 | 구현 위치 | `backend/` (Spring Boot) |
-| LLM | Gemini `gemini-2.5-flash` |
+| LLM | Claude `claude-sonnet-4-6` |
 | RAG (B층) | MVP 비활성 (`cotea.rag.enabled=false`) |
 
 ---
@@ -38,7 +38,7 @@ policy    (문제 메타)  (현재 NoOp)
       PromptAssembler
    (system prompt + user message)
               ↓
-        GeminiClient
+        ClaudeClient
               ↓
       HintResponse (responseText)
 ```
@@ -71,7 +71,7 @@ policy    (문제 메타)  (현재 NoOp)
 }
 ```
 
-### dry-run (Gemini 호출 없음)
+### dry-run (LLM 호출 없음)
 
 요청 body에 `"dryRun": true` 추가 → `systemPrompt`, `userMessage`만 반환.
 
@@ -90,7 +90,7 @@ policy    (문제 메타)  (현재 NoOp)
 | `ProblemContextSelector` | hintLevel별 메타 필드 선택 |
 | `PromptAssembler` | system / user 프롬프트 문자열 조립 |
 | `RagRetrievalService` | RAG 검색 인터페이스 (MVP: `NoOpRagRetrievalService`) |
-| `GeminiClient` | Gemini REST API 호출 |
+| `ClaudeClient` | Anthropic Messages API 호출 |
 
 ---
 
@@ -121,10 +121,12 @@ policy    (문제 메타)  (현재 NoOp)
 cd backend
 
 # API Key: application-local.yml (gitignore)
-#   cotea.gemini.api-key: your-key
+#   cotea.claude.api-key: your-key
 
-./gradlew bootRun --args='--spring.profiles.active=local'
+./gradlew bootRun
 ```
+
+`bootRun`은 기본으로 `local` 프로파일을 사용해 `application-local.yml`을 자동 로드합니다.
 
 ### Postman / curl 테스트
 
@@ -146,7 +148,7 @@ curl -s http://localhost:8080/api/hint \
 
 | 파일 | 용도 |
 |------|------|
-| `application.yml` | 포트, Gemini 모델, 메타 경로 |
+| `application.yml` | 포트, Claude 모델, 메타 경로 |
 | `application-local.yml` | API Key (local, **커밋 금지**) |
 | `prompt-policy.json` | 튜터 정체성, Lv별 allow/forbid |
 | `rag/problems/1829.json` | 문제별 전처리 메타 (gitignore) |
@@ -166,4 +168,4 @@ curl -s http://localhost:8080/api/hint \
 
 - [x] `./gradlew compileJava` 성공
 - [x] `dryRun: true` — 프롬프트 조립 확인
-- [x] Gemini 호출 — `responseText` 정상 (dfs/bfs/Union-Find 언급, 코드 미제공)
+- [x] Claude 호출 — `responseText` 정상 (dfs/bfs 힌트 생성 확인)

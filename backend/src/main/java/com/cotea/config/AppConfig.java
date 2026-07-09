@@ -10,9 +10,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class AppConfig {
 
     @Bean
-    WebClient geminiWebClient(CoteaProperties properties) {
+    WebClient claudeWebClient(CoteaProperties properties) {
         return WebClient.builder()
-                .baseUrl(properties.getGemini().getBaseUrl())
+                .baseUrl(properties.getClaude().getBaseUrl())
                 .build();
     }
 }
