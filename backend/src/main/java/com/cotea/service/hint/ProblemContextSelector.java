@@ -45,9 +45,8 @@ public class ProblemContextSelector {
                 extended.addAll(collectFieldPaths(reasonPolicy.path("afterUserAskReason")));
                 fieldPaths = extended;
             } else {
-                fieldPaths = new ArrayList<>(dedupe(fieldPaths));
-                fieldPaths.add("wrongAnswerDiagnosis.commonMistakes");
-                fieldPaths.add("wrongAnswerDiagnosis.fatalApproachSignals");
+                // 이유 질문 전: 진단·접근 메타 제외 (결과 안내만)
+                fieldPaths = List.of();
             }
         }
 

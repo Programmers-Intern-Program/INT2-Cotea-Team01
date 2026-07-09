@@ -18,6 +18,10 @@ public class PromptAssembler {
     private final QuestionResolver questionResolver;
 
     public String buildSystemPrompt(JsonNode policy, int hintLevel, HintRequest request) {
+        String question = questionResolver.resolve(request);
+        boolean wrongAnswerBeforeReason = "WRONG_ANSWER".equals(request.getStage())
+                && !questionResolver.userAsksReason(question);
+
         JsonNode levelPolicy = policy.path("hintLevelPolicy").path(String.valueOf(hintLevel));
         JsonNode stagePolicy = policy.path("phasePolicy").path(request.getStage());
         JsonNode responseFormat = policy.path("responseFormat");
@@ -29,29 +33,31 @@ public class PromptAssembler {
         sb.append("\n## 절대 제공하지 말 것\n");
         policy.path("doNotReveal").forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
 
-        sb.append("\n## 현재 힌트 레벨: ").append(hintLevel)
-                .append(" (").append(levelPolicy.path("name").asText()).append(")\n");
-        sb.append(levelPolicy.path("description").asText()).append("\n\n");
-        sb.append("### 이 레벨에서 허용\n");
-        levelPolicy.path("allow").forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
-        sb.append("\n### 이 레벨에서 금지\n");
-        levelPolicy.path("forbid").forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
+        if (wrongAnswerBeforeReason) {
+            JsonNode before = policy.path("reasonExplanationPolicy").path("beforeUserAskReason");
+            sb.append("\n## 현재 stage: WRONG_ANSWER (이유 질문 전)\n");
+            sb.append(stagePolicy.path("description").asText()).append('\n');
+            sb.append("\n## 오답 진단 정책\n").append(before.path("behavior").asText()).append('\n');
+            sb.append("예시: ").append(before.path("example").asText()).append("\n\n");
+            sb.append("### 이번 응답에서 추가 금지 (hintLevel 무시)\n");
+            sb.append("- 알고리즘·자료구조 이름\n");
+            sb.append("- 오답·시간초과 원인 추정\n");
+            sb.append("- 구현 방향·접근법 제안\n");
+        } else {
+            sb.append("\n## 현재 힌트 레벨: ").append(hintLevel)
+                    .append(" (").append(levelPolicy.path("name").asText()).append(")\n");
+            sb.append(levelPolicy.path("description").asText()).append("\n\n");
+            sb.append("### 이 레벨에서 허용\n");
+            levelPolicy.path("allow").forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
+            sb.append("\n### 이 레벨에서 금지\n");
+            levelPolicy.path("forbid").forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
 
-        sb.append("\n## 현재 stage: ").append(request.getStage()).append('\n');
-        sb.append(stagePolicy.path("description").asText()).append('\n');
+            sb.append("\n## 현재 stage: ").append(request.getStage()).append('\n');
+            sb.append(stagePolicy.path("description").asText()).append('\n');
 
-        if ("WRONG_ANSWER".equals(request.getStage())) {
-            String question = questionResolver.resolve(request);
-            JsonNode reasonPolicy = policy.path("reasonExplanationPolicy");
-            if (questionResolver.userAsksReason(question)) {
-                JsonNode after = reasonPolicy.path("afterUserAskReason");
+            if ("WRONG_ANSWER".equals(request.getStage())) {
+                JsonNode after = policy.path("reasonExplanationPolicy").path("afterUserAskReason");
                 sb.append("\n## 오답 진단 정책\n").append(after.path("behavior").asText());
-            } else {
-                JsonNode before = reasonPolicy.path("beforeUserAskReason");
-                sb.append("\n## 오답 진단 정책\n")
-                        .append(before.path("behavior").asText())
-                        .append("\n예시: ")
-                        .append(before.path("example").asText());
             }
         }
 

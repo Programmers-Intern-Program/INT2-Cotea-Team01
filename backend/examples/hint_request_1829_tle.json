@@ -1,0 +1,10 @@
+{
+  "problemId": 1829,
+  "stage": "WRONG_ANSWER",
+  "hintLevel": 2,
+  "questionType": "FREE_TEXT",
+  "questionText": "왜 시간초과가 났는지 알려주세요",
+  "userCode": "class Solution {\n    public int[] solution(int m, int n, int[][] picture) {\n        // 중첩 반복으로 모든 칸 조합 탐색\n        return new int[]{0, 0};\n    }\n}",
+  "submissionResult": "TIME_LIMIT_EXCEEDED",
+  "conversationHistory": []
+}

@@ -1,0 +1,10 @@
+{
+  "problemId": 1829,
+  "stage": "WRONG_ANSWER",
+  "hintLevel": 2,
+  "questionType": "BUTTON",
+  "buttonId": "wrong_result_only",
+  "userCode": "class Solution {\n    public int[] solution(int m, int n, int[][] picture) {\n        return new int[]{0, 0};\n    }\n}",
+  "submissionResult": "WRONG_ANSWER",
+  "conversationHistory": []
+}

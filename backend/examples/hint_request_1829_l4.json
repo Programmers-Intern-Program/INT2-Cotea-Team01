@@ -1,0 +1,9 @@
+{
+  "problemId": 1829,
+  "stage": "SOLVING",
+  "hintLevel": 4,
+  "questionType": "BUTTON",
+  "buttonId": "hint_level_4",
+  "userCode": "class Solution {\n    public int[] solution(int m, int n, int[][] picture) {\n        boolean[][] visited = new boolean[m][n];\n        int count = 0;\n        int max = 0;\n        for (int i = 0; i < m; i++) {\n            for (int j = 0; j < n; j++) {\n                if (picture[i][j] != 0 && !visited[i][j]) {\n                    count++;\n                    max = Math.max(max, dfs(picture, visited, i, j));\n                }\n            }\n        }\n        return new int[]{count, max};\n    }\n\n    int dfs(int[][] picture, boolean[][] visited, int r, int c) {\n        visited[r][c] = true;\n        int size = 1;\n        int[][] d = {{1,0},{-1,0},{0,1},{0,-1}};\n        for (int[] dir : d) {\n            int nr = r + dir[0], nc = c + dir[1];\n            if (nr >= 0 && nr < picture.length && nc >= 0 && nc < picture[0].length\n                    && !visited[nr][nc] && picture[nr][nc] == picture[r][c]) {\n                size += dfs(picture, visited, nr, nc);\n            }\n        }\n        return size;\n    }\n}",
+  "conversationHistory": []
+}
