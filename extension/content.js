@@ -52,6 +52,80 @@ function getCurrentLanguage() {
   return 'Unknown';
 }
 
+function getVisibleEditorText() {
+  // CodeMirror JS API/hidden textarea가 실시간으로 안 따라오는 경우가 있어
+  // 화면에 실제로 그려진 코드 줄 DOM을 직접 읽는다 (타이핑 즉시 갱신됨)
+  const editorEl = document.querySelector('.CodeMirror');
+  if (!editorEl) {
+    return null;
+  }
+
+  const lines = editorEl.querySelectorAll('.CodeMirror-line');
+  if (!lines.length) {
+    return null;
+  }
+
+  return Array.from(lines)
+    .map((line) => line.textContent.replace(/​/g, ''))
+    .join('\n');
+}
+
+function getBestAvailableCode() {
+  // 우선순위: 화면에 렌더링된 실제 텍스트(가장 실시간) > CodeMirror API > 굳은 hidden textarea
+  const visibleText = getVisibleEditorText();
+  if (visibleText !== null) {
+    return visibleText;
+  }
+
+  const editorInstance = getCodeMirrorInstance();
+  if (editorInstance) {
+    return editorInstance.getValue();
+  }
+
+  return getFallbackCode();
+}
+
+let lastKnownCode = null;
+let observedEditorEl = null;
+let editorObserver = null;
+let changeDebounceTimer = null;
+
+function notifyIfChanged() {
+  const code = getBestAvailableCode();
+
+  if (!code || code === lastKnownCode) {
+    return;
+  }
+
+  lastKnownCode = code;
+  const language = getCurrentLanguage();
+  console.log('[Cotea Content] 실시간 변경 감지:', code.length, '자,', language);
+  chrome.runtime.sendMessage({ type: 'CODE_CHANGED', code, language });
+}
+
+function attachEditorObserver() {
+  const editorEl = document.querySelector('.CodeMirror');
+  if (!editorEl || editorEl === observedEditorEl) {
+    return;
+  }
+
+  observedEditorEl = editorEl;
+  if (editorObserver) {
+    editorObserver.disconnect();
+  }
+
+  editorObserver = new MutationObserver(() => {
+    clearTimeout(changeDebounceTimer);
+    changeDebounceTimer = setTimeout(notifyIfChanged, 400);
+  });
+  editorObserver.observe(editorEl, { childList: true, subtree: true, characterData: true });
+
+  console.log('[Cotea Content] 코드 에디터 DOM 관찰 시작');
+  notifyIfChanged();
+}
+
+setInterval(attachEditorObserver, 1000);
+
 // background.js의 요청에 응답
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Cotea Content] 메시지 수신:', message.type);
@@ -64,27 +138,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 function readCodeWithRetry(tryCount, sendResponse) {
-  const editorInstance = getCodeMirrorInstance();
-  if (editorInstance) {
-    const code = editorInstance.getValue();
-    const language = getCurrentLanguage();
-    console.log('[Cotea Content] CodeMirror 코드 전송:', code.length, '자,', language);
+  const code = getBestAvailableCode();
+  const language = getCurrentLanguage();
+
+  if (code) {
+    console.log('[Cotea Content] 코드 전송:', code.length, '자,', language);
     sendResponse({ code, language });
     return;
   }
 
   if (tryCount <= 0) {
-    const fallbackCode = getFallbackCode();
-    const language = getCurrentLanguage();
-
-    if (fallbackCode) {
-      console.log('[Cotea Content] fallback 코드 전송:', fallbackCode.length, '자,', language);
-      sendResponse({ code: fallbackCode, language });
-      return;
-    }
-
-    console.log('[Cotea Content] CodeMirror/fallback 모두 실패');
-    sendResponse({ error: 'CodeMirror 에디터를 찾을 수 없습니다.' });
+    console.log('[Cotea Content] 코드를 찾을 수 없음');
+    sendResponse({ error: '코드 에디터를 찾을 수 없습니다.' });
     return;
   }
 
