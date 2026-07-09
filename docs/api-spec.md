@@ -49,7 +49,7 @@
 | stage               | string (enum) | Y                             | `BEFORE_SOLVE`                                                                                                                | `SOLVING`                     | `WRONG_ANSWER` | `AFTER_SOLVE` |
 | hintLevel           | int           | N (선택)                      | 1~4. `BEFORE_SOLVE`에서 사용하는 참고용 필터. **questionType과 독립적** — 특정 레벨을 선택한 상태에서도 자유 텍스트 입력 가능 |
 | questionType        | string (enum) | Y                             | `BUTTON`                                                                                                                      | `FREE_TEXT`                   |
-| buttonId            | string        | questionType=BUTTON일 때 Y    | `STUCK`/`WRONG_ANSWER` 단계에서 쓰는 사전 정의 버튼 질문 ID. **목록 자체가 TBD**                                              |
+| buttonId            | string        | questionType=BUTTON일 때 Y    | 사전 정의 버튼 질문 ID. **목록은 [`button-catalog.md`](./button-catalog.md) 참고** |
 | questionText        | string        | questionType=FREE_TEXT일 때 Y | 사용자가 직접 입력한 질문                                                                                                     |
 | userCode            | string        | Y                             | 현재 에디터에 작성된 코드 전체                                                                                                |
 | conversationHistory | array         | Y (없으면 빈 배열)            | 지금까지의 대화. `[{ role: "user"                                                                                             | "assistant", text: string }]` |
@@ -61,6 +61,16 @@
 - 2단계 (접근 힌트): 알고리즘/자료구조 이름을 공개하고 왜 그 방향인지 간단히 설명
 - 3단계 (구현 힌트): 반복문/조건문/자료구조 사용 방식을 단계별로 안내, 의사코드까지 허용
 - 4단계 (코드 리뷰/디버깅): 사용자가 작성 중인 코드를 기준으로 문제 지점 분석, 필요시 2~3줄 부분 코드 제공
+
+**버튼 ID 목록 (확정)** — 상세는 [`button-catalog.md`](./button-catalog.md)
+
+| buttonId | stage | 설명 |
+|----------|-------|------|
+| `hint_level_1` ~ `hint_level_4` | BEFORE_SOLVE, SOLVING | 힌트 레벨별 사전 질문 |
+| `wrong_result_only` | WRONG_ANSWER | 채점 직후, 이유 질문 전 |
+| `why_wrong` | WRONG_ANSWER | 오답 원인 질문 |
+| `why_tle` | WRONG_ANSWER | 시간초과 원인 질문 |
+| `why_runtime_error` | WRONG_ANSWER | 런타임 에러 원인 질문 |
 
 **요청 예시 (풀기 전, 1단계 힌트 선택)**
 
