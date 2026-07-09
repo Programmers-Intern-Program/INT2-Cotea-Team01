@@ -91,12 +91,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
 
-  if (message.type === 'CODE_UPDATED') {
-    // 최신 코드를 저장해두고 side panel이 필요할 때 꺼내 쓸 수 있게
-    chrome.storage.local.set({
-      latestCode: message.code,
-      languageNotSupported: false,
-      currentLanguage: message.language || 'Java'
+  if (message.type === 'CODE_CHANGED') {
+    // 에디터에서 실시간으로 감지된 변경 - 동기화된 코드와 달라졌는지만 표시
+    getLocalState({ latestCode: '' }).then(({ latestCode }) => {
+      const codeDirty = Boolean(message.code) && message.code !== latestCode;
+      console.log('[Cotea] CODE_CHANGED 수신:', message.code ? message.code.length : 0, '자, codeDirty=', codeDirty);
+      chrome.storage.local.set({ codeDirty });
     });
   }
 
@@ -105,7 +105,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       latestCode: '',
       languageNotSupported: false,
       currentLanguage: 'Java',
-      apiConfig: DEFAULT_API_CONFIG
+      apiConfig: DEFAULT_API_CONFIG,
+      codeDirty: false
     })
       .then((state) => sendResponse(state));
     return true;
@@ -171,7 +172,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chrome.storage.local.set({
             latestCode: response.code,
             languageNotSupported: !isJava,
-            currentLanguage: language
+            currentLanguage: language,
+            codeDirty: false
           });
 
           sendResponse({
