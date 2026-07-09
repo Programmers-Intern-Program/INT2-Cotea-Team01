@@ -1,0 +1,9 @@
+{
+  "problemId": 1829,
+  "stage": "WRONG_ANSWER",
+  "questionType": "FREE_TEXT",
+  "questionText": "왜 틀렸는지 알려주세요",
+  "userCode": "class Solution {\n    public int[] solution(int m, int n, int[][] picture) {\n        return new int[]{0, 0};\n    }\n}",
+  "submissionResult": "WRONG_ANSWER",
+  "conversationHistory": []
+}

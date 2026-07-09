@@ -1,0 +1,9 @@
+{
+  "problemId": 1829,
+  "stage": "SOLVING",
+  "hintLevel": 3,
+  "questionType": "FREE_TEXT",
+  "questionText": "방문 처리를 어떻게 해야 할지 모르겠어요",
+  "userCode": "class Solution {\n    public int[] solution(int m, int n, int[][] picture) {\n        // TODO\n        return new int[]{0, 0};\n    }\n}",
+  "conversationHistory": []
+}

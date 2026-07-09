@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cotea-backend
+
+cotea:
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-2.5-flash
+    base-url: https://generativelanguage.googleapis.com/v1beta
+  problem-meta:
+    # 로컬: ../rag/problems/{problemId}.json
+    directory: ${COTEA_PROBLEM_META_DIR:../rag/problems}
+  rag:
+    enabled: false
