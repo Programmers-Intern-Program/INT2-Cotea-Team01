@@ -47,9 +47,13 @@ const state = {
   busy: false,
   latestCode: '',
   apiConfig: { ...DEFAULT_API_CONFIG },
-  settingsOpen: false,
-  saveState: '',
+  syncing: false,
+  codeDirty: false,
+  onProgrammers: true,
 };
+
+const PROGRAMMERS_HOST = 'school.programmers.co.kr';
+const OFF_SITE_PLACEHOLDER = '코티는 프로그래머스 코드 테스트에서만 작동합니다!';
 
 const root = document.getElementById('root');
 
@@ -248,39 +252,20 @@ function renderHeaderTitle() {
 }
 
 function renderSyncLabel() {
-  return state.latestCode ? '최신 코드 동기화 완료' : '코드 동기화 대기 중';
+  if (!state.latestCode) {
+    return '코드 동기화 대기 중';
+  }
+  if (state.codeDirty) {
+    return '코드를 반영하려면 동기화 버튼을 눌러주세요!';
+  }
+  return '최신 코드 동기화 완료';
 }
 
-function renderSettingsPanel() {
-  if (!state.settingsOpen) {
+function renderSyncDotClass() {
+  if (!state.latestCode) {
     return '';
   }
-
-  return `
-    <section class="settings-panel">
-      <div class="settings-grid">
-        <label class="settings-field">
-          <span>호출 모드</span>
-          <select id="mode-select">
-            <option value="mock" ${state.apiConfig.mode === 'mock' ? 'selected' : ''}>mock</option>
-            <option value="api" ${state.apiConfig.mode === 'api' ? 'selected' : ''}>api</option>
-          </select>
-        </label>
-        <label class="settings-field">
-          <span>Base URL</span>
-          <input id="base-url-input" type="text" value="${escapeHtml(state.apiConfig.baseUrl)}" placeholder="https://api.example.com">
-        </label>
-        <label class="settings-field">
-          <span>Endpoint</span>
-          <input id="endpoint-input" type="text" value="${escapeHtml(state.apiConfig.endpoint)}" placeholder="/api/hint">
-        </label>
-      </div>
-      <div class="settings-footer">
-        <button type="button" class="settings-save" id="save-settings-button">설정 저장</button>
-        <span class="settings-state">${escapeHtml(state.saveState)}</span>
-      </div>
-    </section>
-  `;
+  return state.codeDirty ? 'dirty' : 'ok';
 }
 
 function renderShell() {
@@ -294,7 +279,13 @@ function renderShell() {
               <p class="cotea-kicker">Cotea AI Tutor</p>
               <p class="cotea-title">${escapeHtml(renderHeaderTitle())}</p>
             </div>
-            <button type="button" id="settings-toggle" class="header-action">${state.settingsOpen ? '설정 닫기' : 'API 설정'}</button>
+            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers ? 'disabled' : ''}>
+              <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -304,25 +295,24 @@ function renderShell() {
         </section>
 
         <div class="cotea-bottom-shell">
-          ${renderSettingsPanel()}
           <div class="prompt-chip-row">
             ${CHIPS.map((chip) => {
               const active = state.activeChip === chip.label;
-              return `<button type="button" class="prompt-chip ${active ? 'active' : ''}" data-chip="${escapeHtml(chip.label)}">${escapeHtml(chip.label)}</button>`;
+              return `<button type="button" class="prompt-chip ${active ? 'active' : ''}" data-chip="${escapeHtml(chip.label)}" ${state.onProgrammers ? '' : 'disabled'}>${escapeHtml(chip.label)}</button>`;
             }).join('')}
           </div>
 
           <div class="sync-row">
-            <span class="sync-dot ${state.latestCode ? 'ok' : ''}"></span>
-            <span class="sync-label">${escapeHtml(renderSyncLabel())}</span>
+            <span class="sync-dot ${renderSyncDotClass()}"></span>
+            <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
           </div>
 
           <div class="composer-row ${state.activeChip && state.input === state.activeChip ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <input id="question-input" type="text" value="${escapeHtml(state.input)}" placeholder="Cotea에게 질문하세요..." ${state.busy ? 'disabled' : ''}>
+              <input id="question-input" type="text" value="${escapeHtml(state.input)}" placeholder="${state.onProgrammers ? 'Cotea에게 질문하세요...' : OFF_SITE_PLACEHOLDER}" ${state.busy || !state.onProgrammers ? 'disabled' : ''}>
               ${state.activeChip && state.input === state.activeChip ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
-            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy ? 'disabled' : ''}>
+            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
             </button>
           </div>
@@ -345,12 +335,9 @@ function renderShell() {
 }
 
 function bindEvents() {
-  const settingsToggle = document.getElementById('settings-toggle');
-  if (settingsToggle) {
-    settingsToggle.addEventListener('click', () => {
-      state.settingsOpen = !state.settingsOpen;
-      renderShell();
-    });
+  const syncButton = document.getElementById('sync-button');
+  if (syncButton) {
+    syncButton.addEventListener('click', handleSync);
   }
 
   const questionInput = document.getElementById('question-input');
@@ -398,53 +385,54 @@ function bindEvents() {
     });
   });
 
-  const modeSelect = document.getElementById('mode-select');
-  if (modeSelect) {
-    modeSelect.addEventListener('change', (event) => {
-      state.apiConfig.mode = event.target.value;
-    });
-  }
-
-  const baseUrlInput = document.getElementById('base-url-input');
-  if (baseUrlInput) {
-    baseUrlInput.addEventListener('input', (event) => {
-      state.apiConfig.baseUrl = event.target.value.trim();
-    });
-  }
-
-  const endpointInput = document.getElementById('endpoint-input');
-  if (endpointInput) {
-    endpointInput.addEventListener('input', (event) => {
-      state.apiConfig.endpoint = event.target.value;
-    });
-  }
-
-  const saveSettingsButton = document.getElementById('save-settings-button');
-  if (saveSettingsButton) {
-    saveSettingsButton.addEventListener('click', saveSettings);
-  }
 }
 
-async function saveSettings() {
-  state.saveState = '저장 중...';
+async function handleSync() {
+  if (state.syncing || !state.onProgrammers) {
+    return;
+  }
+
+  state.syncing = true;
   renderShell();
 
   try {
-    await sendRuntimeMessage({
-      type: 'SET_API_CONFIG',
-      payload: state.apiConfig,
-    });
-    state.saveState = '저장됨';
-  } catch (error) {
-    state.saveState = `저장 실패: ${error.message}`;
-  }
+    const response = await sendRuntimeMessage({ type: 'SYNC_CODE' });
 
-  renderShell();
+    if (response && response.error) {
+      state.messages.push({
+        id: Date.now(),
+        role: 'ai',
+        text: response.error,
+        timestamp: nowLabel(),
+      });
+    } else if (response && response.code) {
+      state.latestCode = response.code;
+      state.codeDirty = false;
+      if (response.warning) {
+        state.messages.push({
+          id: Date.now(),
+          role: 'ai',
+          text: response.warning,
+          timestamp: nowLabel(),
+        });
+      }
+    }
+  } catch (error) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: `코드 동기화 중 오류가 발생했습니다. ${error.message}`,
+      timestamp: nowLabel(),
+    });
+  } finally {
+    state.syncing = false;
+    renderShell();
+  }
 }
 
 async function handleSend() {
   const question = state.input.trim();
-  if (!question || state.busy) {
+  if (!question || state.busy || !state.onProgrammers) {
     return;
   }
 
@@ -485,11 +473,28 @@ async function handleSend() {
   }
 }
 
+function refreshActiveTabStatus() {
+  if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
+    return;
+  }
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs && tabs[0];
+    const onProgrammers = Boolean(activeTab && activeTab.url && activeTab.url.includes(PROGRAMMERS_HOST));
+
+    if (onProgrammers !== state.onProgrammers) {
+      state.onProgrammers = onProgrammers;
+      renderShell();
+    }
+  });
+}
+
 async function initialize() {
   try {
     const response = await sendRuntimeMessage({ type: 'GET_PANEL_STATE' });
     state.latestCode = response && response.latestCode ? response.latestCode : '';
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
+    state.codeDirty = Boolean(response && response.codeDirty);
   } catch (error) {
     state.messages.push({
       id: Date.now() + 3,
@@ -497,6 +502,21 @@ async function initialize() {
       text: `초기 상태를 불러오지 못했습니다. ${error.message}`,
       timestamp: nowLabel(),
     });
+  }
+
+  refreshActiveTabStatus();
+
+  if (typeof chrome !== 'undefined' && chrome.tabs) {
+    if (chrome.tabs.onActivated) {
+      chrome.tabs.onActivated.addListener(refreshActiveTabStatus);
+    }
+    if (chrome.tabs.onUpdated) {
+      chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+        if (changeInfo.status === 'complete' || changeInfo.url) {
+          refreshActiveTabStatus();
+        }
+      });
+    }
   }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -510,6 +530,10 @@ async function initialize() {
 
     if (changes.apiConfig) {
       state.apiConfig = { ...DEFAULT_API_CONFIG, ...(changes.apiConfig.newValue || {}) };
+    }
+
+    if (changes.codeDirty) {
+      state.codeDirty = Boolean(changes.codeDirty.newValue);
     }
 
     renderShell();
