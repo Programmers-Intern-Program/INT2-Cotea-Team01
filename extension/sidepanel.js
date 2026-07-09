@@ -28,6 +28,8 @@ const state = {
   stage: null,
   hintLevel: 2,
   apiConfig: { ...DEFAULT_API_CONFIG },
+  settingsOpen: false,
+  saveState: '',
   syncing: false,
   codeDirty: false,
   onProgrammers: true,
@@ -327,6 +329,38 @@ function renderSyncDotClass() {
   return state.codeDirty ? 'dirty' : 'ok';
 }
 
+function renderSettingsPanel() {
+  if (!state.settingsOpen) {
+    return '';
+  }
+
+  return `
+    <section class="settings-panel">
+      <div class="settings-grid">
+        <label class="settings-field">
+          <span>호출 모드</span>
+          <select id="mode-select">
+            <option value="mock" ${state.apiConfig.mode === 'mock' ? 'selected' : ''}>mock</option>
+            <option value="api" ${state.apiConfig.mode === 'api' ? 'selected' : ''}>api</option>
+          </select>
+        </label>
+        <label class="settings-field">
+          <span>Base URL</span>
+          <input id="base-url-input" type="text" value="${escapeHtml(state.apiConfig.baseUrl)}" placeholder="http://localhost:8080">
+        </label>
+        <label class="settings-field">
+          <span>Endpoint</span>
+          <input id="endpoint-input" type="text" value="${escapeHtml(state.apiConfig.endpoint)}" placeholder="/api/hint">
+        </label>
+      </div>
+      <div class="settings-footer">
+        <button type="button" class="settings-save" id="save-settings-button">설정 저장</button>
+        <span class="settings-state">${escapeHtml(state.saveState)}</span>
+      </div>
+    </section>
+  `;
+}
+
 function renderShell() {
   root.innerHTML = `
     <div class="cotea-stage">
@@ -338,13 +372,18 @@ function renderShell() {
               <p class="cotea-kicker">Cotea AI Tutor</p>
               <p class="cotea-title">${escapeHtml(renderHeaderTitle())}</p>
             </div>
-            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers ? 'disabled' : ''}>
-              <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-              </svg>
-            </button>
+            <div class="header-actions">
+              <button type="button" id="settings-toggle" class="header-action settings-toggle" aria-label="API 설정">
+                API
+              </button>
+              <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers ? 'disabled' : ''}>
+                <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -354,6 +393,7 @@ function renderShell() {
         </section>
 
         <div class="cotea-bottom-shell">
+          ${renderSettingsPanel()}
           <div class="prompt-chip-row">
             ${CHIPS.map((chip) => {
               const active = state.activeChip === chip.label;
@@ -394,6 +434,14 @@ function renderShell() {
 }
 
 function bindEvents() {
+  const settingsToggle = document.getElementById('settings-toggle');
+  if (settingsToggle) {
+    settingsToggle.addEventListener('click', () => {
+      state.settingsOpen = !state.settingsOpen;
+      renderShell();
+    });
+  }
+
   const syncButton = document.getElementById('sync-button');
   if (syncButton) {
     syncButton.addEventListener('click', handleSync);
@@ -444,6 +492,48 @@ function bindEvents() {
     });
   });
 
+  const modeSelect = document.getElementById('mode-select');
+  if (modeSelect) {
+    modeSelect.addEventListener('change', (event) => {
+      state.apiConfig.mode = event.target.value;
+    });
+  }
+
+  const baseUrlInput = document.getElementById('base-url-input');
+  if (baseUrlInput) {
+    baseUrlInput.addEventListener('input', (event) => {
+      state.apiConfig.baseUrl = event.target.value.trim();
+    });
+  }
+
+  const endpointInput = document.getElementById('endpoint-input');
+  if (endpointInput) {
+    endpointInput.addEventListener('input', (event) => {
+      state.apiConfig.endpoint = event.target.value;
+    });
+  }
+
+  const saveSettingsButton = document.getElementById('save-settings-button');
+  if (saveSettingsButton) {
+    saveSettingsButton.addEventListener('click', saveSettings);
+  }
+}
+
+async function saveSettings() {
+  state.saveState = '저장 중...';
+  renderShell();
+
+  try {
+    await sendRuntimeMessage({
+      type: 'SET_API_CONFIG',
+      payload: state.apiConfig,
+    });
+    state.saveState = '저장됨';
+  } catch (error) {
+    state.saveState = `저장 실패: ${error.message}`;
+  }
+
+  renderShell();
 }
 
 async function handleSync() {
