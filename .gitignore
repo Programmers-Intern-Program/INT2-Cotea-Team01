@@ -40,3 +40,6 @@ claude-api-key*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# --- Claude Code ---
+CLAUDE.md
