@@ -30,6 +30,24 @@ function getFallbackCode() {
   return '';
 }
 
+function parseProblemId() {
+  const url = window.location.href;
+  const patterns = [
+    /\/lessons\/(\d+)/,
+    /\/challenges\/(\d+)/,
+    /[?&]problem_id=(\d+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+
+  return null;
+}
+
 function getCurrentLanguage() {
   // 프로그래머스 언어 선택 버튼에서 현재 선택된 언어 확인
   let langButton = document.querySelector('div.dropdown-language button.btn.btn-sm.btn-dark');
@@ -140,10 +158,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function readCodeWithRetry(tryCount, sendResponse) {
   const code = getBestAvailableCode();
   const language = getCurrentLanguage();
+  const problemId = parseProblemId();
 
   if (code) {
     console.log('[Cotea Content] 코드 전송:', code.length, '자,', language);
-    sendResponse({ code, language });
+    sendResponse({ code, language, problemId });
     return;
   }
 

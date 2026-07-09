@@ -1,9 +1,11 @@
 // background.js
 const DEFAULT_API_CONFIG = {
-  mode: 'mock',
-  baseUrl: '',
+  mode: 'api',
+  baseUrl: 'http://localhost:8080',
   endpoint: '/api/hint',
 };
+
+const DEFAULT_PROBLEM_ID = 1829;
 
 function getLocalState(defaults) {
   return new Promise((resolve) => {
@@ -17,7 +19,8 @@ function setLocalState(nextState) {
   });
 }
 
-function buildMockAnswer(question, code) {
+function buildMockAnswer(questionText, code) {
+  const question = questionText || '';
   const codeLines = code ? code.split('\n').length : 0;
   const codePreview = code
     ? code.split('\n').slice(0, 3).join('\n')
@@ -43,12 +46,41 @@ function buildMockAnswer(question, code) {
   };
 }
 
+function buildHintRequestBody(message) {
+  const hintRequest = message.hintRequest || {};
+  const body = {
+    problemId: hintRequest.problemId ?? DEFAULT_PROBLEM_ID,
+    stage: hintRequest.stage || 'BEFORE_SOLVE',
+    questionType: hintRequest.questionType || 'FREE_TEXT',
+    userCode: hintRequest.userCode ?? '',
+    conversationHistory: Array.isArray(hintRequest.conversationHistory)
+      ? hintRequest.conversationHistory
+      : [],
+  };
+
+  if (hintRequest.hintLevel != null) {
+    body.hintLevel = hintRequest.hintLevel;
+  }
+  if (hintRequest.questionType === 'BUTTON') {
+    body.buttonId = hintRequest.buttonId;
+  } else {
+    body.questionText = hintRequest.questionText || '';
+  }
+  if (hintRequest.stage === 'WRONG_ANSWER' && hintRequest.submissionResult) {
+    body.submissionResult = hintRequest.submissionResult;
+  }
+
+  return body;
+}
+
 async function requestHintFromApi(message) {
   const { apiConfig } = await getLocalState({ apiConfig: DEFAULT_API_CONFIG });
   const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
+  const hintRequest = message.hintRequest || {};
+  const questionText = hintRequest.questionText || message.question || '';
 
   if (mergedConfig.mode !== 'api' || !mergedConfig.baseUrl) {
-    return buildMockAnswer(message.question, message.code);
+    return buildMockAnswer(questionText, hintRequest.userCode || message.code);
   }
 
   const normalizedBaseUrl = mergedConfig.baseUrl.replace(/\/$/, '');
@@ -59,21 +91,28 @@ async function requestHintFromApi(message) {
   const response = await fetch(`${normalizedBaseUrl}${normalizedEndpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code: message.code,
-      question: message.question,
-      source: 'chrome-extension',
-    }),
+    body: JSON.stringify(buildHintRequestBody(message)),
   });
 
   if (!response.ok) {
-    throw new Error(`API 요청 실패: ${response.status}`);
+    let detail = '';
+    try {
+      const errorBody = await response.json();
+      if (errorBody.message) {
+        detail = `: ${errorBody.message}`;
+      }
+    } catch (_error) {
+      // ignore parse errors
+    }
+    throw new Error(`API 요청 실패: ${response.status}${detail}`);
   }
 
   const data = await response.json();
   return {
-    answer: data.answer || data.message || '응답 본문에 answer 필드가 없습니다.',
+    answer: data.responseText || data.answer || data.message || '응답 본문에 responseText 필드가 없습니다.',
     source: 'api',
+    hintLevel: data.hintLevel,
+    stage: data.stage,
   };
 }
 
@@ -105,8 +144,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       latestCode: '',
       languageNotSupported: false,
       currentLanguage: 'Java',
+      problemId: null,
       apiConfig: DEFAULT_API_CONFIG,
-      codeDirty: false
+      codeDirty: false,
     })
       .then((state) => sendResponse(state));
     return true;
@@ -169,16 +209,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const isJava = /java/i.test(language);
 
           // 받은 코드를 저장
-          chrome.storage.local.set({
+          const nextState = {
             latestCode: response.code,
             languageNotSupported: !isJava,
             currentLanguage: language,
-            codeDirty: false
-          });
+            codeDirty: false,
+          };
+          if (response.problemId != null) {
+            nextState.problemId = response.problemId;
+          }
+          chrome.storage.local.set(nextState);
 
           sendResponse({
             ...response,
-            warning: isJava ? '' : `현재 선택 언어(${language})는 미지원입니다. Java로 바꿔주세요.`
+            warning: isJava ? '' : `현재 선택 언어(${language})는 미지원입니다. Java로 바꿔주세요.`,
           });
         } else if (response && response.error) {
           console.log('[Cotea] content.js 오류:', response.error);
