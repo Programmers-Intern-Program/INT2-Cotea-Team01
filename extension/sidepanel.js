@@ -1,51 +1,32 @@
 const DEFAULT_API_CONFIG = {
-  mode: 'mock',
-  baseUrl: '',
+  mode: 'api',
+  baseUrl: 'http://localhost:8080',
   endpoint: '/api/hint',
 };
+
+const DEFAULT_PROBLEM_ID = 1829;
 
 const AVATAR_URL = chrome.runtime.getURL('mascot.png');
 
 const CHIPS = [
-  { label: '접근 방식 힌트', resp: 'DFS 재귀로 각 인덱스마다 +/−를 분기하고, 배열 끝에서 target과 비교하는 구조예요. 반환값을 합산하는 방식이 가장 깔끔합니다.' },
-  { label: '자료구조 추천', resp: '별도 자료구조는 불필요해요. 재귀 스택 자체가 DFS 역할을 합니다. BFS라면 ArrayDeque 같은 큐 구조를 쓰면 돼요.' },
-  { label: '시간복잡도 분석', resp: 'O(2^n) 구조예요. 각 숫자마다 두 갈래로 분기하므로 숫자가 20개면 최대 약 100만 번 정도 탐색합니다.' },
+  { label: '접근 방식 힌트', buttonId: 'hint_level_2', hintLevel: 2 },
+  { label: '자료구조 추천', buttonId: 'hint_level_2', hintLevel: 2 },
+  { label: '시간복잡도 분석', buttonId: 'hint_level_3', hintLevel: 3 },
 ];
+
+const CHIP_BY_LABEL = Object.fromEntries(CHIPS.map((chip) => [chip.label, chip]));
 
 const SAMPLE_CODE = `class Solution {\n    int answer = 0;\n\n    public int solution(int[] numbers,\n                        int target) {\n        dfs(numbers, target, 0, 0);\n        return answer;\n    }\n\n    void dfs(int[] numbers, int target,\n             int index, int current) {\n        if (index == numbers.length) {\n            if (current == target)\n                answer++;\n            return;\n        }\n        // ← 이 줄을 확인해 보세요!\n        dfs(numbers, target, index + 1,\n            current + numbers[index]);\n        dfs(numbers, target, index + 1,\n            current - numbers[index]);\n    }\n}`;
 
 const state = {
-  messages: [
-    {
-      id: 1,
-      role: 'ai',
-      text: '안녕하세요! 저는 Cotea예요.\n\n오늘의 문제 "타겟 넘버"를 함께 풀어봐요. 각 숫자에 +/− 부호를 붙여 target을 만드는 경우의 수를 구하는 완전탐색 문제예요.\n\n어떤 방식으로 시작해보실 건가요?',
-      timestamp: '10:24',
-    },
-    {
-      id: 2,
-      role: 'user',
-      text: 'DFS로 재귀 짜봤는데 결과가 항상 0이 나와요.',
-      timestamp: '10:31',
-    },
-    {
-      id: 3,
-      role: 'ai',
-      text: '코드를 분석해봤어요. 15번째 줄에서 반환값 처리에 문제가 있어 보여요.',
-      timestamp: '10:31',
-      code: { src: SAMPLE_CODE, hl: 14 },
-      trailChips: ['이유가 뭔가요?', '어떻게 고쳐야 할까요?'],
-    },
-    {
-      id: 4,
-      role: 'divider',
-      text: '풀이 중 단계로 넘어왔어요!',
-    },
-  ],
-  input: '자료구조 추천',
-  activeChip: '자료구조 추천',
+  messages: [],
+  input: '',
+  activeChip: null,
   busy: false,
   latestCode: '',
+  problemId: null,
+  stage: null,
+  hintLevel: 2,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
   codeDirty: false,
@@ -72,6 +53,81 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function resolveStage() {
+  if (state.stage) {
+    return state.stage;
+  }
+  return state.latestCode && state.latestCode.trim() ? 'SOLVING' : 'BEFORE_SOLVE';
+}
+
+function buildConversationHistory() {
+  return state.messages
+    .filter((message) => message.role === 'user' || message.role === 'ai')
+    .map((message) => ({
+      role: message.role === 'ai' ? 'assistant' : 'user',
+      text: message.text,
+    }));
+}
+
+function buildHintRequest(questionText, chipLabel) {
+  const chip = chipLabel ? CHIP_BY_LABEL[chipLabel] : null;
+  const stage = resolveStage();
+  const problemId = state.problemId || DEFAULT_PROBLEM_ID;
+  const base = {
+    problemId,
+    stage,
+    userCode: state.latestCode || '',
+    conversationHistory: buildConversationHistory(),
+  };
+
+  if (chip && chipLabel === questionText) {
+    return {
+      ...base,
+      questionType: 'BUTTON',
+      buttonId: chip.buttonId,
+      hintLevel: chip.hintLevel,
+    };
+  }
+
+  return {
+    ...base,
+    questionType: 'FREE_TEXT',
+    questionText,
+    hintLevel: state.hintLevel || (stage === 'BEFORE_SOLVE' ? 2 : 3),
+  };
+}
+
+function ensureWelcomeMessage() {
+  if (state.messages.length > 0) {
+    return;
+  }
+
+  const problemLabel = state.problemId ? `문제 #${state.problemId}` : '프로그래머스 문제';
+  state.messages.push({
+    id: Date.now(),
+    role: 'ai',
+    text: `안녕하세요! 저는 Cotea예요.\n\n${problemLabel}를 함께 풀어봐요. 궁금한 점을 입력하거나 아래 칩을 눌러보세요.`,
+    timestamp: nowLabel(),
+  });
+}
+
+async function syncPageContext() {
+  try {
+    const response = await sendRuntimeMessage({ type: 'SYNC_CODE' });
+    if (response && response.error) {
+      return;
+    }
+    if (response && response.code) {
+      state.latestCode = response.code;
+    }
+    if (response && response.problemId != null) {
+      state.problemId = response.problemId;
+    }
+  } catch (_error) {
+    // 프로그래머스 탭이 없으면 무시
+  }
 }
 
 function sendRuntimeMessage(payload) {
@@ -246,9 +302,12 @@ function renderBusyIndicator() {
 }
 
 function renderHeaderTitle() {
+  if (state.problemId) {
+    return `문제 #${state.problemId} · ${resolveStage()}`;
+  }
   return state.latestCode
-    ? '문제: 프로그래머스 실시간 코드 분석'
-    : '문제: 프로그래머스 Lv2 "타겟 넘버"';
+    ? '프로그래머스 실시간 코드 분석'
+    : '프로그래머스 문제';
 }
 
 function renderSyncLabel() {
@@ -408,6 +467,9 @@ async function handleSync() {
     } else if (response && response.code) {
       state.latestCode = response.code;
       state.codeDirty = false;
+      if (response.problemId != null) {
+        state.problemId = response.problemId;
+      }
       if (response.warning) {
         state.messages.push({
           id: Date.now(),
@@ -432,9 +494,12 @@ async function handleSync() {
 
 async function handleSend() {
   const question = state.input.trim();
+  const chipLabel = state.activeChip;
   if (!question || state.busy || !state.onProgrammers) {
     return;
   }
+
+  const hintRequest = buildHintRequest(question, chipLabel);
 
   state.messages.push({
     id: Date.now(),
@@ -450,9 +515,12 @@ async function handleSend() {
   try {
     const response = await sendRuntimeMessage({
       type: 'ASK_AI',
-      code: state.latestCode,
-      question,
+      hintRequest,
     });
+
+    if (response && response.source === 'error') {
+      throw new Error(response.answer || '응답 생성 중 오류가 발생했습니다.');
+    }
 
     state.messages.push({
       id: Date.now() + 1,
@@ -493,6 +561,7 @@ async function initialize() {
   try {
     const response = await sendRuntimeMessage({ type: 'GET_PANEL_STATE' });
     state.latestCode = response && response.latestCode ? response.latestCode : '';
+    state.problemId = response && response.problemId != null ? response.problemId : null;
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
     state.codeDirty = Boolean(response && response.codeDirty);
   } catch (error) {
@@ -504,6 +573,8 @@ async function initialize() {
     });
   }
 
+  await syncPageContext();
+  ensureWelcomeMessage();
   refreshActiveTabStatus();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
@@ -526,6 +597,10 @@ async function initialize() {
 
     if (changes.latestCode) {
       state.latestCode = changes.latestCode.newValue || '';
+    }
+
+    if (changes.problemId) {
+      state.problemId = changes.problemId.newValue ?? null;
     }
 
     if (changes.apiConfig) {
