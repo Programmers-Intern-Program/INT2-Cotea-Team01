@@ -128,7 +128,12 @@
 - `400 MISSING_QUESTION_TEXT` — `questionType=FREE_TEXT`인데 questionText 누락
 - `400 MISSING_SUBMISSION_RESULT` — `stage=WRONG_ANSWER`인데 submissionResult 누락
 - `400 INVALID_SUBMISSION_RESULT` — submissionResult 값 오류 또는 오답 원인 버튼과 submissionResult 불일치
-- `500 AI_SERVICE_ERROR` — AI 응답 생성 실패 (Claude API 오류 등)
+- `429 AI_RATE_LIMITED` — Claude API 요청 한도 초과
+- `500 AI_SERVICE_ERROR` — AI 응답 형식 오류
+- `502 AI_SERVICE_ERROR` — Claude API 네트워크 요청 실패 또는 예상하지 못한 4xx 오류
+- `502 AI_AUTH_ERROR` — Claude API 인증 설정 오류
+- `502 AI_SERVICE_UNAVAILABLE` — Claude API 5xx 계열 오류
+- `504 AI_SERVICE_ERROR` — Claude API 응답 시간 초과
 
 ---
 
