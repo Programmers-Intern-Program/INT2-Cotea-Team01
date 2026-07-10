@@ -633,6 +633,55 @@ function handleSubmissionResultSelect(value) {
   }
 }
 
+async function handleSync() {
+  if (state.syncing || !state.onProgrammers) {
+    return;
+  }
+
+  state.syncing = true;
+  renderShell();
+
+  try {
+    const response = await sendRuntimeMessage({ type: 'SYNC_CODE' });
+
+    if (response && response.error) {
+      state.messages.push({
+        id: Date.now(),
+        role: 'ai',
+        text: response.error,
+        timestamp: nowLabel(),
+      });
+    } else if (response && response.code) {
+      state.latestCode = response.code;
+      state.codeDirty = false;
+      if (response.problemId != null) {
+        state.problemId = response.problemId;
+      }
+      if (response.problemTitle) {
+        state.problemTitle = response.problemTitle;
+      }
+      if (response.warning) {
+        state.messages.push({
+          id: Date.now(),
+          role: 'ai',
+          text: response.warning,
+          timestamp: nowLabel(),
+        });
+      }
+    }
+  } catch (error) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: `코드 동기화 중 오류가 발생했습니다. ${error.message}`,
+      timestamp: nowLabel(),
+    });
+  } finally {
+    state.syncing = false;
+    renderShell();
+  }
+}
+
 async function dispatchHintRequest(hintRequest, displayText) {
   state.messages.push({
     id: Date.now(),
