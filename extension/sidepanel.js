@@ -547,11 +547,15 @@ function bindEvents() {
       if (!isActiveChipUnedited()) {
         state.activeChip = null;
       }
+      if (event.isComposing) {
+        // 한글 등 IME 조합 중에는 DOM을 재생성하면 조합이 깨지므로 렌더링을 건너뜀
+        return;
+      }
       renderShell();
     });
 
     questionInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' && !event.isComposing) {
         event.preventDefault();
         handleSend();
       }
