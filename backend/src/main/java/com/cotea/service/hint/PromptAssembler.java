@@ -60,6 +60,9 @@ public class PromptAssembler {
                 JsonNode after = policy.path("reasonExplanationPolicy").path("afterUserAskReason");
                 sb.append("\n## 오답 진단 정책\n").append(after.path("behavior").asText());
                 appendSubmissionResultGuidance(sb, policy, request, false);
+                if (questionResolver.userAsksReason(question)) {
+                    appendUserCodeDiagnosisGuidance(sb, policy, request);
+                }
             }
         }
 
@@ -122,6 +125,28 @@ public class PromptAssembler {
         }
         if (byResult.hasNonNull("afterAskFocus")) {
             sb.append("- 진단 초점: ").append(byResult.path("afterAskFocus").asText()).append('\n');
+        }
+    }
+
+    private void appendUserCodeDiagnosisGuidance(StringBuilder sb, JsonNode policy, HintRequest request) {
+        if (request.getUserCode() == null || request.getUserCode().isBlank()) {
+            return;
+        }
+        JsonNode withUserCode = policy.path("reasonExplanationPolicy")
+                .path("afterUserAskReason")
+                .path("withUserCode");
+        if (!withUserCode.isObject()) {
+            return;
+        }
+
+        sb.append("\n### 사용자 코드 참고 지침 (userCode 제공됨)\n");
+        if (withUserCode.hasNonNull("behavior")) {
+            sb.append(withUserCode.path("behavior").asText()).append('\n');
+        }
+        JsonNode forbid = withUserCode.path("forbid");
+        if (forbid.isArray() && forbid.size() > 0) {
+            sb.append("금지:\n");
+            forbid.forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
         }
     }
 }
