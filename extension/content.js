@@ -30,6 +30,29 @@ function getFallbackCode() {
   return '';
 }
 
+function getProblemTitle() {
+  // 문제 본문 영역에서 흔히 쓰이는 제목 엘리먼트 후보들 (페이지 구조가 바뀌면 갱신 필요)
+  const titleSelectors = [
+    '.challenge-title',
+    '.list-header h4',
+    '.result-content h4',
+    'div.markdown h1',
+    'article h1',
+  ];
+
+  for (const selector of titleSelectors) {
+    const el = document.querySelector(selector);
+    if (el && el.textContent.trim()) {
+      return el.textContent.trim();
+    }
+  }
+
+  // DOM에서 못 찾으면 탭 제목에서 유추 (보통 "문제명 - 코딩테스트 연습 | 프로그래머스 스쿨" 형태)
+  const rawTitle = document.title || '';
+  const cleaned = rawTitle.split(/[-|·]/)[0].trim();
+  return cleaned || '';
+}
+
 function parseProblemId() {
   const url = window.location.href;
   const patterns = [
@@ -107,8 +130,34 @@ let lastKnownCode = null;
 let observedEditorEl = null;
 let editorObserver = null;
 let changeDebounceTimer = null;
+let contextInvalidated = false;
+let attachObserverIntervalId = null;
+
+function isExtensionContextValid() {
+  return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
+}
+
+function handleContextInvalidated() {
+  if (contextInvalidated) {
+    return;
+  }
+  contextInvalidated = true;
+  console.log('[Cotea Content] 익스텐션이 리로드되어 이 탭의 연결이 끊겼습니다. 감지를 중단합니다 (페이지를 새로고침하면 복구됩니다).');
+
+  if (editorObserver) {
+    editorObserver.disconnect();
+  }
+  clearTimeout(changeDebounceTimer);
+  if (attachObserverIntervalId) {
+    clearInterval(attachObserverIntervalId);
+  }
+}
 
 function notifyIfChanged() {
+  if (contextInvalidated) {
+    return;
+  }
+
   const code = getBestAvailableCode();
 
   if (!code || code === lastKnownCode) {
@@ -117,11 +166,31 @@ function notifyIfChanged() {
 
   lastKnownCode = code;
   const language = getCurrentLanguage();
+
+  if (!isExtensionContextValid()) {
+    handleContextInvalidated();
+    return;
+  }
+
   console.log('[Cotea Content] 실시간 변경 감지:', code.length, '자,', language);
-  chrome.runtime.sendMessage({ type: 'CODE_CHANGED', code, language });
+  try {
+    chrome.runtime.sendMessage({
+      type: 'CODE_CHANGED',
+      code,
+      language,
+      problemId: parseProblemId(),
+      problemTitle: getProblemTitle(),
+    });
+  } catch (_error) {
+    handleContextInvalidated();
+  }
 }
 
 function attachEditorObserver() {
+  if (contextInvalidated) {
+    return;
+  }
+
   const editorEl = document.querySelector('.CodeMirror');
   if (!editorEl || editorEl === observedEditorEl) {
     return;
@@ -142,7 +211,7 @@ function attachEditorObserver() {
   notifyIfChanged();
 }
 
-setInterval(attachEditorObserver, 1000);
+attachObserverIntervalId = setInterval(attachEditorObserver, 1000);
 
 // background.js의 요청에 응답
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -159,10 +228,11 @@ function readCodeWithRetry(tryCount, sendResponse) {
   const code = getBestAvailableCode();
   const language = getCurrentLanguage();
   const problemId = parseProblemId();
+  const problemTitle = getProblemTitle();
 
   if (code) {
     console.log('[Cotea Content] 코드 전송:', code.length, '자,', language);
-    sendResponse({ code, language, problemId });
+    sendResponse({ code, language, problemId, problemTitle });
     return;
   }
 

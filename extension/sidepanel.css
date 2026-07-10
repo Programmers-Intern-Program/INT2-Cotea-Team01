@@ -546,6 +546,80 @@ button {
   }
 }
 
+.stage-select-row,
+.sub-select-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 12px 14px 0;
+}
+
+.sub-select-row {
+  padding-top: 8px;
+}
+
+.hint-level-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.hint-level-grid .sub-chip {
+  text-align: center;
+}
+
+.stage-chip,
+.sub-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(27, 42, 74, 0.11);
+  background: rgba(27, 42, 74, 0.055);
+  color: #1b2a4a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stage-chip.active,
+.sub-chip.active {
+  border-color: transparent;
+  background: #1b2a4a;
+  color: #eef2ff;
+  box-shadow: 0 2px 8px rgba(27, 42, 74, 0.22);
+}
+
+.stage-chip:disabled,
+.sub-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stage-chip.current {
+  border-color: transparent;
+  background: #1b2a4a;
+  color: #eef2ff;
+}
+
+.stage-chip.active.stage-before-solve,
+.stage-chip.current.stage-before-solve {
+  background: #2563eb;
+}
+
+.stage-chip.active.stage-solving,
+.stage-chip.current.stage-solving {
+  background: #059669;
+}
+
+.stage-chip.active.stage-wrong-answer,
+.stage-chip.current.stage-wrong-answer {
+  background: #dc2626;
+}
+
+.stage-chip-edit {
+  margin-left: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+
 .prompt-chip-row {
   display: flex;
   gap: 6px;
