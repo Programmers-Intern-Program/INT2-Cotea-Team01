@@ -135,7 +135,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     getLocalState({ latestCode: '' }).then(({ latestCode }) => {
       const codeDirty = Boolean(message.code) && message.code !== latestCode;
       console.log('[Cotea] CODE_CHANGED 수신:', message.code ? message.code.length : 0, '자, codeDirty=', codeDirty);
-      chrome.storage.local.set({ codeDirty });
+      const nextState = { codeDirty };
+      if (message.problemId != null) {
+        nextState.problemId = message.problemId;
+      }
+      if (message.problemTitle) {
+        nextState.problemTitle = message.problemTitle;
+      }
+      chrome.storage.local.set(nextState);
     });
   }
 
@@ -145,6 +152,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       languageNotSupported: false,
       currentLanguage: 'Java',
       problemId: null,
+      problemTitle: null,
       apiConfig: DEFAULT_API_CONFIG,
       codeDirty: false,
     })
@@ -217,6 +225,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           };
           if (response.problemId != null) {
             nextState.problemId = response.problemId;
+          }
+          if (response.problemTitle) {
+            nextState.problemTitle = response.problemTitle;
           }
           chrome.storage.local.set(nextState);
 
