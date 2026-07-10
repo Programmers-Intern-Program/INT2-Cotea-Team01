@@ -52,6 +52,27 @@ class PromptAssemblerTest {
         assertThat(systemPrompt).contains("배열 범위·방문 배열 크기 등 런타임 원인 제시");
     }
 
+    @Test
+    void includesUserCodeDiagnosisGuidanceWhenCodeProvided() {
+        HintRequest request = wrongAnswerRequest("WRONG_ANSWER", "why_wrong");
+        request.setUserCode("class Solution { }");
+
+        String systemPrompt = assembler.buildSystemPrompt(policy, 2, request);
+
+        assertThat(systemPrompt).contains("사용자 코드 참고 지침 (userCode 제공됨)");
+        assertThat(systemPrompt).contains("가장 관련 있는 항목 1~2개만");
+        assertThat(systemPrompt).contains("commonMistakes 후보 전부 나열");
+    }
+
+    @Test
+    void omitsUserCodeDiagnosisGuidanceWhenCodeMissing() {
+        HintRequest request = wrongAnswerRequest("WRONG_ANSWER", "why_wrong");
+
+        String systemPrompt = assembler.buildSystemPrompt(policy, 2, request);
+
+        assertThat(systemPrompt).doesNotContain("사용자 코드 참고 지침");
+    }
+
     private HintRequest wrongAnswerRequest(String submissionResult, String buttonId) {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);
