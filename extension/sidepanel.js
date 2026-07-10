@@ -8,13 +8,33 @@ const DEFAULT_PROBLEM_ID = 1829;
 
 const AVATAR_URL = chrome.runtime.getURL('mascot.png');
 
-const CHIPS = [
-  { label: '접근 방식 힌트', buttonId: 'hint_level_2', hintLevel: 2 },
-  { label: '자료구조 추천', buttonId: 'hint_level_2', hintLevel: 2 },
-  { label: '시간복잡도 분석', buttonId: 'hint_level_3', hintLevel: 3 },
+const STAGE_OPTIONS = [
+  { value: 'BEFORE_SOLVE', label: '풀기 전', colorClass: 'stage-before-solve' },
+  { value: 'SOLVING', label: '풀이 중', colorClass: 'stage-solving' },
+  { value: 'WRONG_ANSWER', label: '오답이에요', colorClass: 'stage-wrong-answer' },
 ];
 
-const CHIP_BY_LABEL = Object.fromEntries(CHIPS.map((chip) => [chip.label, chip]));
+const STAGE_LABEL = Object.fromEntries(STAGE_OPTIONS.map((opt) => [opt.value, opt.label]));
+
+const HINT_LEVEL_OPTIONS = [
+  { hintLevel: 1, buttonId: 'hint_level_1', label: '1단계 관점 힌트', question: '이 문제를 어떤 관점에서 바라봐야 할지 모르겠어요' },
+  { hintLevel: 2, buttonId: 'hint_level_2', label: '2단계 접근 힌트', question: '어떤 알고리즘으로 접근해야 할지 모르겠어요' },
+  { hintLevel: 3, buttonId: 'hint_level_3', label: '3단계 구현 힌트', question: '구현 순서가 잘 안 잡혀요' },
+  { hintLevel: 4, buttonId: 'hint_level_4', label: '4단계 코드 리뷰', question: '제 코드에서 문제가 있는지 봐주세요' },
+];
+
+const SUBMISSION_RESULT_OPTIONS = [
+  { value: 'WRONG_ANSWER', label: '오답', whyButtonId: 'why_wrong', whyLabel: '왜 틀렸나요?', whyQuestion: '왜 틀렸는지 알려주세요' },
+  { value: 'TIME_LIMIT_EXCEEDED', label: '시간초과', whyButtonId: 'why_tle', whyLabel: '왜 시간초과?', whyQuestion: '왜 시간초과가 났는지 알려주세요' },
+  { value: 'RUNTIME_ERROR', label: '런타임 에러', whyButtonId: 'why_runtime_error', whyLabel: '왜 런타임 에러?', whyQuestion: '왜 런타임 에러가 났는지 알려주세요' },
+];
+
+const CATALOG_CHIPS = [
+  ...HINT_LEVEL_OPTIONS.map((opt) => ({ label: opt.label, buttonId: opt.buttonId, question: opt.question, hintLevel: opt.hintLevel })),
+  ...SUBMISSION_RESULT_OPTIONS.map((opt) => ({ label: opt.whyLabel, buttonId: opt.whyButtonId, question: opt.whyQuestion })),
+];
+
+const CHIP_BY_LABEL = Object.fromEntries(CATALOG_CHIPS.map((chip) => [chip.label, chip]));
 
 const SAMPLE_CODE = `class Solution {\n    int answer = 0;\n\n    public int solution(int[] numbers,\n                        int target) {\n        dfs(numbers, target, 0, 0);\n        return answer;\n    }\n\n    void dfs(int[] numbers, int target,\n             int index, int current) {\n        if (index == numbers.length) {\n            if (current == target)\n                answer++;\n            return;\n        }\n        // ← 이 줄을 확인해 보세요!\n        dfs(numbers, target, index + 1,\n            current + numbers[index]);\n        dfs(numbers, target, index + 1,\n            current - numbers[index]);\n    }\n}`;
 
@@ -25,8 +45,11 @@ const state = {
   busy: false,
   latestCode: '',
   problemId: null,
+  problemTitle: null,
   stage: null,
-  hintLevel: 2,
+  stagePickerOpen: true,
+  hintLevel: null,
+  submissionResult: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
   codeDirty: false,
@@ -55,11 +78,21 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function resolveStage() {
-  if (state.stage) {
-    return state.stage;
+function isComposerReady() {
+  if (!state.stage) {
+    return false;
   }
-  return state.latestCode && state.latestCode.trim() ? 'SOLVING' : 'BEFORE_SOLVE';
+  if (state.stage === 'BEFORE_SOLVE' && !state.hintLevel) {
+    return false;
+  }
+  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
+    return false;
+  }
+  return true;
+}
+
+function pushStageDivider(label) {
+  state.messages.push({ id: Date.now(), role: 'divider', text: label });
 }
 
 function buildConversationHistory() {
@@ -73,7 +106,7 @@ function buildConversationHistory() {
 
 function buildHintRequest(questionText, chipLabel) {
   const chip = chipLabel ? CHIP_BY_LABEL[chipLabel] : null;
-  const stage = resolveStage();
+  const stage = state.stage;
   const problemId = state.problemId || DEFAULT_PROBLEM_ID;
   const base = {
     problemId,
@@ -82,12 +115,16 @@ function buildHintRequest(questionText, chipLabel) {
     conversationHistory: buildConversationHistory(),
   };
 
+  if (stage === 'WRONG_ANSWER') {
+    base.submissionResult = state.submissionResult;
+  }
+
   if (chip && chipLabel === questionText) {
     return {
       ...base,
       questionType: 'BUTTON',
       buttonId: chip.buttonId,
-      hintLevel: chip.hintLevel,
+      ...(chip.hintLevel ? { hintLevel: chip.hintLevel } : {}),
     };
   }
 
@@ -95,7 +132,7 @@ function buildHintRequest(questionText, chipLabel) {
     ...base,
     questionType: 'FREE_TEXT',
     questionText,
-    hintLevel: state.hintLevel || (stage === 'BEFORE_SOLVE' ? 2 : 3),
+    ...(stage === 'BEFORE_SOLVE' ? { hintLevel: state.hintLevel } : {}),
   };
 }
 
@@ -108,7 +145,7 @@ function ensureWelcomeMessage() {
   state.messages.push({
     id: Date.now(),
     role: 'ai',
-    text: `안녕하세요! 저는 Cotea예요.\n\n${problemLabel}를 함께 풀어봐요. 궁금한 점을 입력하거나 아래 칩을 눌러보세요.`,
+    text: `안녕하세요! 저는 Cotea예요.\n\n${problemLabel}를 함께 풀어봐요. 먼저 아래에서 지금 상태를 선택해 주세요.`,
     timestamp: nowLabel(),
   });
 }
@@ -124,6 +161,9 @@ async function syncPageContext() {
     }
     if (response && response.problemId != null) {
       state.problemId = response.problemId;
+    }
+    if (response && response.problemTitle) {
+      state.problemTitle = response.problemTitle;
     }
   } catch (_error) {
     // 프로그래머스 탭이 없으면 무시
@@ -302,12 +342,13 @@ function renderBusyIndicator() {
 }
 
 function renderHeaderTitle() {
-  if (state.problemId) {
-    return `문제 #${state.problemId} · ${resolveStage()}`;
+  if (state.problemTitle) {
+    return `프로그래머스 문제 - ${state.problemTitle}`;
   }
-  return state.latestCode
-    ? '프로그래머스 실시간 코드 분석'
-    : '프로그래머스 문제';
+  if (state.problemId) {
+    return `문제 #${state.problemId}`;
+  }
+  return '프로그래머스 문제';
 }
 
 function renderSyncLabel() {
@@ -325,6 +366,72 @@ function renderSyncDotClass() {
     return '';
   }
   return state.codeDirty ? 'dirty' : 'ok';
+}
+
+function renderComposerPlaceholder() {
+  if (!state.onProgrammers) {
+    return OFF_SITE_PLACEHOLDER;
+  }
+  if (!state.stage) {
+    return '먼저 위에서 지금 상태를 선택해주세요';
+  }
+  if (state.stage === 'BEFORE_SOLVE' && !state.hintLevel) {
+    return '힌트 레벨을 선택해주세요';
+  }
+  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
+    return '채점 결과를 선택해주세요';
+  }
+  return 'Cotea에게 질문하세요...';
+}
+
+function renderStageSelector() {
+  if (state.stage && !state.stagePickerOpen) {
+    const opt = STAGE_OPTIONS.find((o) => o.value === state.stage);
+    return `
+      <div class="stage-select-row">
+        <button type="button" class="stage-chip current ${opt ? opt.colorClass : ''}" data-stage-change ${!state.onProgrammers || state.busy ? 'disabled' : ''}>
+          상태: ${escapeHtml(opt ? opt.label : state.stage)}<span class="stage-chip-edit">변경</span>
+        </button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="stage-select-row">
+      ${STAGE_OPTIONS.map((opt) => {
+        const active = state.stage === opt.value;
+        return `<button type="button" class="stage-chip ${active ? `active ${opt.colorClass}` : ''}" data-stage="${opt.value}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderHintLevelSelector() {
+  if (state.stage !== 'BEFORE_SOLVE') {
+    return '';
+  }
+  return `
+    <div class="sub-select-row hint-level-grid">
+      ${HINT_LEVEL_OPTIONS.map((opt) => {
+        const active = state.hintLevel === opt.hintLevel;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderSubmissionResultSelector() {
+  if (state.stage !== 'WRONG_ANSWER') {
+    return '';
+  }
+  return `
+    <div class="sub-select-row">
+      ${SUBMISSION_RESULT_OPTIONS.map((opt) => {
+        const active = state.submissionResult === opt.value;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-submission-result="${opt.value}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+      }).join('')}
+    </div>
+  `;
 }
 
 function renderShell() {
@@ -354,12 +461,9 @@ function renderShell() {
         </section>
 
         <div class="cotea-bottom-shell">
-          <div class="prompt-chip-row">
-            ${CHIPS.map((chip) => {
-              const active = state.activeChip === chip.label;
-              return `<button type="button" class="prompt-chip ${active ? 'active' : ''}" data-chip="${escapeHtml(chip.label)}" ${state.onProgrammers ? '' : 'disabled'}>${escapeHtml(chip.label)}</button>`;
-            }).join('')}
-          </div>
+          ${renderStageSelector()}
+          ${renderHintLevelSelector()}
+          ${renderSubmissionResultSelector()}
 
           <div class="sync-row">
             <span class="sync-dot ${renderSyncDotClass()}"></span>
@@ -368,10 +472,10 @@ function renderShell() {
 
           <div class="composer-row ${state.activeChip && state.input === state.activeChip ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <input id="question-input" type="text" value="${escapeHtml(state.input)}" placeholder="${state.onProgrammers ? 'Cotea에게 질문하세요...' : OFF_SITE_PLACEHOLDER}" ${state.busy || !state.onProgrammers ? 'disabled' : ''}>
+              <input id="question-input" type="text" value="${escapeHtml(state.input)}" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
               ${state.activeChip && state.input === state.activeChip ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
-            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers ? 'disabled' : ''}>
+            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
             </button>
           </div>
@@ -444,71 +548,98 @@ function bindEvents() {
     });
   });
 
-}
-
-async function handleSync() {
-  if (state.syncing || !state.onProgrammers) {
-    return;
-  }
-
-  state.syncing = true;
-  renderShell();
-
-  try {
-    const response = await sendRuntimeMessage({ type: 'SYNC_CODE' });
-
-    if (response && response.error) {
-      state.messages.push({
-        id: Date.now(),
-        role: 'ai',
-        text: response.error,
-        timestamp: nowLabel(),
-      });
-    } else if (response && response.code) {
-      state.latestCode = response.code;
-      state.codeDirty = false;
-      if (response.problemId != null) {
-        state.problemId = response.problemId;
-      }
-      if (response.warning) {
-        state.messages.push({
-          id: Date.now(),
-          role: 'ai',
-          text: response.warning,
-          timestamp: nowLabel(),
-        });
-      }
-    }
-  } catch (error) {
-    state.messages.push({
-      id: Date.now(),
-      role: 'ai',
-      text: `코드 동기화 중 오류가 발생했습니다. ${error.message}`,
-      timestamp: nowLabel(),
+  document.querySelectorAll('[data-stage]').forEach((button) => {
+    button.addEventListener('click', () => {
+      handleStageSelect(button.dataset.stage || '');
     });
-  } finally {
-    state.syncing = false;
+  });
+
+  const stageChangeButton = document.querySelector('[data-stage-change]');
+  if (stageChangeButton) {
+    stageChangeButton.addEventListener('click', () => {
+      if (state.busy) {
+        return;
+      }
+      state.stagePickerOpen = true;
+      renderShell();
+    });
+  }
+
+  document.querySelectorAll('[data-hint-level]').forEach((button) => {
+    button.addEventListener('click', () => {
+      handleHintLevelSelect(Number(button.dataset.hintLevel));
+    });
+  });
+
+  document.querySelectorAll('[data-submission-result]').forEach((button) => {
+    button.addEventListener('click', () => {
+      handleSubmissionResultSelect(button.dataset.submissionResult || '');
+    });
+  });
+}
+
+function handleStageSelect(value) {
+  if (state.busy) {
+    return;
+  }
+  if (state.stage === value) {
+    state.stagePickerOpen = false;
     renderShell();
+    return;
+  }
+  state.stage = value;
+  state.stagePickerOpen = false;
+  state.hintLevel = null;
+  state.submissionResult = null;
+  state.activeChip = null;
+  state.input = '';
+  pushStageDivider(STAGE_LABEL[value] || value);
+  renderShell();
+}
+
+function handleHintLevelSelect(level) {
+  if (state.busy) {
+    return;
+  }
+  const opt = HINT_LEVEL_OPTIONS.find((o) => o.hintLevel === level);
+  if (!opt) {
+    return;
+  }
+  state.hintLevel = level;
+  state.input = opt.question;
+  state.activeChip = opt.label;
+  renderShell();
+  const input = document.getElementById('question-input');
+  if (input) {
+    input.focus();
   }
 }
 
-async function handleSend() {
-  const question = state.input.trim();
-  const chipLabel = state.activeChip;
-  if (!question || state.busy || !state.onProgrammers) {
+function handleSubmissionResultSelect(value) {
+  if (state.busy) {
     return;
   }
+  const opt = SUBMISSION_RESULT_OPTIONS.find((o) => o.value === value);
+  if (!opt) {
+    return;
+  }
+  state.submissionResult = value;
+  state.input = opt.whyQuestion;
+  state.activeChip = opt.whyLabel;
+  renderShell();
+  const input = document.getElementById('question-input');
+  if (input) {
+    input.focus();
+  }
+}
 
-  const hintRequest = buildHintRequest(question, chipLabel);
-
+async function dispatchHintRequest(hintRequest, displayText) {
   state.messages.push({
     id: Date.now(),
     role: 'user',
-    text: question,
+    text: displayText,
     timestamp: nowLabel(),
   });
-  state.input = '';
-  state.activeChip = null;
   state.busy = true;
   renderShell();
 
@@ -541,6 +672,19 @@ async function handleSend() {
   }
 }
 
+async function handleSend() {
+  const question = state.input.trim();
+  const chipLabel = state.activeChip;
+  if (!question || state.busy || !state.onProgrammers || !isComposerReady()) {
+    return;
+  }
+
+  const hintRequest = buildHintRequest(question, chipLabel);
+  state.input = '';
+  state.activeChip = null;
+  await dispatchHintRequest(hintRequest, question);
+}
+
 function refreshActiveTabStatus() {
   if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
     return;
@@ -562,6 +706,7 @@ async function initialize() {
     const response = await sendRuntimeMessage({ type: 'GET_PANEL_STATE' });
     state.latestCode = response && response.latestCode ? response.latestCode : '';
     state.problemId = response && response.problemId != null ? response.problemId : null;
+    state.problemTitle = response && response.problemTitle ? response.problemTitle : null;
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
     state.codeDirty = Boolean(response && response.codeDirty);
   } catch (error) {
@@ -601,6 +746,10 @@ async function initialize() {
 
     if (changes.problemId) {
       state.problemId = changes.problemId.newValue ?? null;
+    }
+
+    if (changes.problemTitle) {
+      state.problemTitle = changes.problemTitle.newValue || null;
     }
 
     if (changes.apiConfig) {
