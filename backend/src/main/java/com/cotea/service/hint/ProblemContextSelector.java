@@ -3,6 +3,7 @@ package com.cotea.service.hint;
 import com.cotea.controller.dto.HintRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,6 +16,13 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ProblemContextSelector {
+
+    private static final String COMMON_MISTAKES_PATH = "wrongAnswerDiagnosis.commonMistakes";
+    private static final Map<String, String> SUBMISSION_RESULT_TO_SYMPTOM = Map.of(
+            "WRONG_ANSWER", "오답",
+            "TIME_LIMIT_EXCEEDED", "시간초과",
+            "RUNTIME_ERROR", "런타임에러"
+    );
 
     private final QuestionResolver questionResolver;
     private final ObjectMapper objectMapper;
@@ -53,7 +61,10 @@ public class ProblemContextSelector {
         Map<String, JsonNode> fields = new LinkedHashMap<>();
         for (String path : dedupe(fieldPaths)) {
             JsonNode value = getNested(problem, path);
-            if (value != null && !value.isNull() && !value.isMissingNode()) {
+            if (COMMON_MISTAKES_PATH.equals(path) && request.getSubmissionResult() != null) {
+                value = filterCommonMistakesBySubmissionResult(value, request.getSubmissionResult());
+            }
+            if (value != null && !value.isNull() && !value.isMissingNode() && !isEmptyNode(value)) {
                 fields.put(path, value);
             }
         }
@@ -86,6 +97,24 @@ public class ProblemContextSelector {
             }
         }
         return paths;
+    }
+
+    private JsonNode filterCommonMistakesBySubmissionResult(JsonNode mistakes, String submissionResult) {
+        String symptom = SUBMISSION_RESULT_TO_SYMPTOM.get(submissionResult);
+        if (symptom == null || mistakes == null || !mistakes.isArray()) {
+            return mistakes;
+        }
+        ArrayNode filtered = objectMapper.createArrayNode();
+        for (JsonNode item : mistakes) {
+            if (symptom.equals(item.path("symptom").asText())) {
+                filtered.add(item);
+            }
+        }
+        return filtered;
+    }
+
+    private boolean isEmptyNode(JsonNode value) {
+        return value.isArray() && value.isEmpty();
     }
 
     private JsonNode getNested(JsonNode problem, String dottedPath) {
