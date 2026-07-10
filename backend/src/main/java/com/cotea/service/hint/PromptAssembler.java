@@ -38,8 +38,9 @@ public class PromptAssembler {
             sb.append("\n## 현재 stage: WRONG_ANSWER (이유 질문 전)\n");
             sb.append(stagePolicy.path("description").asText()).append('\n');
             sb.append("\n## 오답 진단 정책\n").append(before.path("behavior").asText()).append('\n');
-            sb.append("예시: ").append(before.path("example").asText()).append("\n\n");
-            sb.append("### 이번 응답에서 추가 금지 (hintLevel 무시)\n");
+            sb.append("예시: ").append(before.path("example").asText()).append('\n');
+            appendSubmissionResultGuidance(sb, policy, request, true);
+            sb.append("\n### 이번 응답에서 추가 금지 (hintLevel 무시)\n");
             sb.append("- 알고리즘·자료구조 이름\n");
             sb.append("- 오답·시간초과 원인 추정\n");
             sb.append("- 구현 방향·접근법 제안\n");
@@ -58,6 +59,7 @@ public class PromptAssembler {
             if ("WRONG_ANSWER".equals(request.getStage())) {
                 JsonNode after = policy.path("reasonExplanationPolicy").path("afterUserAskReason");
                 sb.append("\n## 오답 진단 정책\n").append(after.path("behavior").asText());
+                appendSubmissionResultGuidance(sb, policy, request, false);
             }
         }
 
@@ -90,5 +92,36 @@ public class PromptAssembler {
 
         sb.append("\n## 사용자 질문\n").append(question);
         return sb.toString();
+    }
+
+    private void appendSubmissionResultGuidance(
+            StringBuilder sb,
+            JsonNode policy,
+            HintRequest request,
+            boolean beforeReason
+    ) {
+        if (request.getSubmissionResult() == null) {
+            return;
+        }
+        JsonNode byResult = policy.path("reasonExplanationPolicy")
+                .path("bySubmissionResult")
+                .path(request.getSubmissionResult());
+        if (!byResult.isObject()) {
+            return;
+        }
+
+        sb.append("\n### 채점 결과별 안내 (submissionResult)\n");
+        if (beforeReason) {
+            if (byResult.hasNonNull("resultPhrase")) {
+                sb.append("- 안내 문구: ").append(byResult.path("resultPhrase").asText()).append('\n');
+            }
+            if (byResult.hasNonNull("beforeAskFocus")) {
+                sb.append("- 유도 초점: ").append(byResult.path("beforeAskFocus").asText()).append('\n');
+            }
+            return;
+        }
+        if (byResult.hasNonNull("afterAskFocus")) {
+            sb.append("- 진단 초점: ").append(byResult.path("afterAskFocus").asText()).append('\n');
+        }
     }
 }
