@@ -26,7 +26,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -645,7 +646,7 @@ button {
 }
 
 .prompt-chip:disabled,
-.composer-input-wrap input:disabled {
+.composer-input-wrap textarea:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -698,7 +699,7 @@ button {
 
 .composer-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   margin: 0 14px;
   padding: 10px 14px;
@@ -716,40 +717,46 @@ button {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
-.composer-input-wrap input {
+.composer-input-wrap textarea {
   width: 100%;
   padding: 0;
   border: 0;
   outline: none;
+  resize: none;
+  overflow-y: hidden;
   background: transparent;
   color: #1b2a4a;
   font-size: 12.5px;
+  line-height: 1.5;
+  font-family: inherit;
 }
 
-.composer-row.caret-mode .composer-input-wrap input {
+.composer-row.caret-mode .composer-input-wrap textarea {
   caret-color: transparent;
 }
 
 .fake-caret-layer {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
   pointer-events: none;
 }
 
 .ghost-text {
   visibility: hidden;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
   font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .fake-caret {
+  display: inline-block;
   width: 1.5px;
   height: 14px;
+  vertical-align: text-bottom;
   margin-left: 1px;
   border-radius: 1px;
   background: #1b2a4a;

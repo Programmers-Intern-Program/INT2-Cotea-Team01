@@ -442,6 +442,19 @@ function renderSubmissionResultSelector() {
   `;
 }
 
+const COMPOSER_MAX_HEIGHT = 120;
+
+function autoResizeComposerInput() {
+  const textarea = document.getElementById('question-input');
+  if (!textarea) {
+    return;
+  }
+  textarea.style.height = 'auto';
+  const nextHeight = Math.min(textarea.scrollHeight, COMPOSER_MAX_HEIGHT);
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = textarea.scrollHeight > COMPOSER_MAX_HEIGHT ? 'auto' : 'hidden';
+}
+
 function renderShell() {
   const focusedId = document.activeElement && document.activeElement.id;
   const focusedSelection = focusedId === 'question-input'
@@ -485,7 +498,7 @@ function renderShell() {
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <input id="question-input" type="text" value="${escapeHtml(state.input)}" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
+              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
               ${isActiveChipUnedited() ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
             <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
@@ -503,6 +516,7 @@ function renderShell() {
   `;
 
   bindEvents();
+  autoResizeComposerInput();
 
   if (focusedId) {
     const elementToFocus = document.getElementById(focusedId);
