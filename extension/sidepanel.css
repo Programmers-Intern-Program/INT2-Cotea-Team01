@@ -699,7 +699,7 @@ button {
 
 .composer-row {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
   margin: 0 14px;
   padding: 10px 14px;
@@ -717,7 +717,7 @@ button {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .composer-input-wrap textarea {
