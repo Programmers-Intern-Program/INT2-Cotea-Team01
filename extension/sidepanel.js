@@ -443,6 +443,11 @@ function renderSubmissionResultSelector() {
 }
 
 function renderShell() {
+  const focusedId = document.activeElement && document.activeElement.id;
+  const focusedSelection = focusedId === 'question-input'
+    ? [document.activeElement.selectionStart, document.activeElement.selectionEnd]
+    : null;
+
   root.innerHTML = `
     <div class="cotea-stage">
       <div class="cotea-frame">
@@ -498,6 +503,16 @@ function renderShell() {
   `;
 
   bindEvents();
+
+  if (focusedId) {
+    const elementToFocus = document.getElementById(focusedId);
+    if (elementToFocus) {
+      elementToFocus.focus();
+      if (focusedSelection && typeof elementToFocus.setSelectionRange === 'function') {
+        elementToFocus.setSelectionRange(focusedSelection[0], focusedSelection[1]);
+      }
+    }
+  }
 
   const chatScroll = document.getElementById('chat-scroll');
   if (chatScroll) {
