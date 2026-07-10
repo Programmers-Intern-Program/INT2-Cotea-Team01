@@ -95,6 +95,14 @@ function pushStageDivider(label) {
   state.messages.push({ id: Date.now(), role: 'divider', text: label });
 }
 
+function isActiveChipUnedited() {
+  if (!state.activeChip) {
+    return false;
+  }
+  const chip = CHIP_BY_LABEL[state.activeChip];
+  return Boolean(chip) && state.input === chip.question;
+}
+
 function buildConversationHistory() {
   return state.messages
     .filter((message) => message.role === 'user' || message.role === 'ai')
@@ -119,7 +127,7 @@ function buildHintRequest(questionText, chipLabel) {
     base.submissionResult = state.submissionResult;
   }
 
-  if (chip && chipLabel === questionText) {
+  if (chip && chip.question === questionText) {
     return {
       ...base,
       questionType: 'BUTTON',
@@ -470,10 +478,10 @@ function renderShell() {
             <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
           </div>
 
-          <div class="composer-row ${state.activeChip && state.input === state.activeChip ? 'caret-mode' : ''}">
+          <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
               <input id="question-input" type="text" value="${escapeHtml(state.input)}" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
-              ${state.activeChip && state.input === state.activeChip ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
+              ${isActiveChipUnedited() ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
             <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
@@ -507,7 +515,7 @@ function bindEvents() {
   if (questionInput) {
     questionInput.addEventListener('input', (event) => {
       state.input = event.target.value;
-      if (state.input !== state.activeChip) {
+      if (!isActiveChipUnedited()) {
         state.activeChip = null;
       }
       renderShell();
@@ -525,19 +533,6 @@ function bindEvents() {
   if (sendButton) {
     sendButton.addEventListener('click', handleSend);
   }
-
-  document.querySelectorAll('[data-chip]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const label = button.dataset.chip || '';
-      state.input = label;
-      state.activeChip = label;
-      renderShell();
-      const input = document.getElementById('question-input');
-      if (input) {
-        input.focus();
-      }
-    });
-  });
 
   document.querySelectorAll('[data-trail-chip]').forEach((button) => {
     button.addEventListener('click', () => {
