@@ -11,8 +11,7 @@
   "permissions": ["storage", "sidePanel", "tabs"],
   "host_permissions": [
     "https://school.programmers.co.kr/*",
-    "http://localhost/*",
-    "https://*/*"
+    "http://localhost/*"
   ],
   "background": {
     "service_worker": "background.js"
