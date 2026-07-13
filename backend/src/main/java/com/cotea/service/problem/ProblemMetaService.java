@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -16,8 +17,17 @@ public class ProblemMetaService {
 
     private final CoteaProperties properties;
     private final ObjectMapper objectMapper;
+    private final ProblemMetaRepository problemMetaRepository;
+    private final ProblemMetaMapper problemMetaMapper;
 
+    @Transactional(readOnly = true)
     public JsonNode load(int problemId) {
+        return problemMetaRepository.findById(problemId)
+                .map(problemMetaMapper::toJson)
+                .orElseGet(() -> loadFromFile(problemId));
+    }
+
+    private JsonNode loadFromFile(int problemId) {
         Path path = Path.of(properties.getProblemMeta().getDirectory(), problemId + ".json");
         if (!Files.exists(path)) {
             throw new CoteaException(

@@ -1,7 +1,12 @@
-# 코티(Cotea) ERD — 문제 메타데이터 (v0.1)
+# 코티(Cotea) ERD — 문제 메타데이터 (v0.2)
 
 > 관계형 DB(MySQL/PostgreSQL 등)로 저장한다는 가정 하에 작성. **DB 종류 자체는 팀 확정 필요.**
 > RAG 지식 베이스(B) / common_pitfalls는 벡터 DB 대상이라 이 ERD 범위에서 제외 — 별도 문서(벡터DB 스키마 ) 참고.
+
+## 변경 이력
+
+- **v0.2 (2026-07-13)**: `json_to_sql.py`가 이미 생성하고 있었지만 이 문서에는 빠져있던 6개 테이블(KEY_DATA_STRUCTURE, FATAL_APPROACH_SIGNAL, EDGE_CASE, EVALUATION_CRITERIA, OPTIMIZATION_HINT, SIMILAR_PROBLEM)을 반영. 문제 JSON 스키마에 새로 추가된 `approach.complexityVariables` 필드를 담을 COMPLEXITY_VARIABLE 테이블 신설. `classification.primary[].tag` 통제 어휘를 20개 → 21개(`math` 추가)로 갱신.
+- v0.1: 최초 작성.
 
 ## 엔티티 관계도
 
@@ -9,9 +14,16 @@
 erDiagram
   PROBLEM ||--o{ PROBLEM_CLASSIFICATION : has
   PROBLEM ||--o{ APPROACH_ALTERNATIVE : has
+  PROBLEM ||--o{ COMPLEXITY_VARIABLE : has
   PROBLEM ||--o{ SOLVING_CHECKPOINT : has
   PROBLEM ||--o{ STUCK_POINT_HINT : has
+  PROBLEM ||--o{ KEY_DATA_STRUCTURE : has
   PROBLEM ||--o{ WRONG_ANSWER_MISTAKE : has
+  PROBLEM ||--o{ FATAL_APPROACH_SIGNAL : has
+  PROBLEM ||--o{ EDGE_CASE : has
+  PROBLEM ||--o{ EVALUATION_CRITERIA : has
+  PROBLEM ||--o{ OPTIMIZATION_HINT : has
+  PROBLEM ||--o{ SIMILAR_PROBLEM : has
 
   PROBLEM {
     int problem_id PK
@@ -37,6 +49,17 @@ erDiagram
     int problem_id FK
     string approach_name
   }
+  COMPLEXITY_VARIABLE {
+    int id PK
+    int problem_id FK
+    string variable_name
+    string variable_description
+  }
+  KEY_DATA_STRUCTURE {
+    int id PK
+    int problem_id FK
+    string structure_name
+  }
   SOLVING_CHECKPOINT {
     int id PK
     int problem_id FK
@@ -56,6 +79,31 @@ erDiagram
     string likely_cause
     string direction_hint
   }
+  FATAL_APPROACH_SIGNAL {
+    int id PK
+    int problem_id FK
+    string signal_text
+  }
+  EDGE_CASE {
+    int id PK
+    int problem_id FK
+    string case_text
+  }
+  EVALUATION_CRITERIA {
+    int id PK
+    int problem_id FK
+    string criteria_text
+  }
+  OPTIMIZATION_HINT {
+    int id PK
+    int problem_id FK
+    string hint_text
+  }
+  SIMILAR_PROBLEM {
+    int id PK
+    int problem_id FK
+    string problem_name
+  }
 ```
 
 ## 엔티티 설명
@@ -69,11 +117,19 @@ erDiagram
 
 ### PROBLEM_CLASSIFICATION
 
-문제 하나가 여러 알고리즘 태그를 가질 수 있어 1:N. `tag`는 20개 통제 어휘 중 하나, `subcategory`는 해당 없으면 NULL.
+문제 하나가 여러 알고리즘 태그를 가질 수 있어 1:N. `tag`는 21개 통제 어휘(`math` 포함) 중 하나, `subcategory`는 해당 없으면 NULL.
 
 ### APPROACH_ALTERNATIVE
 
 `alternativeApproaches` 배열(예: ["DFS", "BFS"])을 담는 테이블.
+
+### COMPLEXITY_VARIABLE
+
+`approach.complexityVariables`(예: {"n": "배열의 길이"})를 담는 테이블. `variable_name`/`variable_description` 쌍. 시간·공간복잡도 표기에 쓰인 변수가 `n` 하나뿐인 문제는 이 필드 자체가 생략되므로 해당 문제는 이 테이블에 행이 없을 수 있다.
+
+### KEY_DATA_STRUCTURE
+
+`solvingSupport.keyDataStructures` 배열(예: "HashMap<String, Integer>")을 담는 테이블.
 
 ### SOLVING_CHECKPOINT
 
@@ -86,6 +142,26 @@ erDiagram
 ### WRONG_ANSWER_MISTAKE
 
 오답 진단(힌트 4단계 등)에서 쓰는 흔한 실수 목록. `symptom`(시간초과/오답/런타임에러), `likely_cause`, `direction_hint`.
+
+### FATAL_APPROACH_SIGNAL
+
+`wrongAnswerDiagnosis.fatalApproachSignals` 배열을 담는 테이블. 느린 접근이 아니라 구조적으로 답이 나올 수 없는 접근만 해당.
+
+### EDGE_CASE
+
+`edgeCases` 배열(빈 입력, 단일 원소, 경계값 등 확인해볼 조건)을 담는 테이블.
+
+### EVALUATION_CRITERIA
+
+`afterSolve.evaluationCriteria` 배열을 담는 테이블.
+
+### OPTIMIZATION_HINT
+
+`afterSolve.optimizationHints` 배열을 담는 테이블.
+
+### SIMILAR_PROBLEM
+
+`afterSolve.similarProblems` 배열을 담는 테이블. 현재 작업 방침상 이 필드는 항상 빈 배열로 채워지고 있어, 지금 시점엔 이 테이블에 행이 생성되지 않는다.
 
 ## 의도적으로 제외한 것
 
