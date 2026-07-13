@@ -6,6 +6,7 @@ const DEFAULT_API_CONFIG = {
 };
 
 const DEFAULT_PROBLEM_ID = 1829;
+const HINT_API_TIMEOUT_MS = 20000;
 
 function getLocalState(defaults) {
   return new Promise((resolve, reject) => {
@@ -103,11 +104,25 @@ async function requestHintFromApi(message) {
     ? mergedConfig.endpoint
     : `/${mergedConfig.endpoint}`;
 
-  const response = await fetch(`${normalizedBaseUrl}${normalizedEndpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildHintRequestBody(message)),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), HINT_API_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(`${normalizedBaseUrl}${normalizedEndpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildHintRequestBody(message)),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let detail = '';
