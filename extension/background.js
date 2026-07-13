@@ -88,6 +88,9 @@ function buildHintRequestBody(message) {
 async function requestHintFromApi(message) {
   const { apiConfig } = await getLocalState({ apiConfig: DEFAULT_API_CONFIG });
   const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
+  if (!mergedConfig.endpoint) {
+    mergedConfig.endpoint = DEFAULT_API_CONFIG.endpoint;
+  }
   const hintRequest = message.hintRequest || {};
   const questionText = hintRequest.questionText || message.question || '';
 
