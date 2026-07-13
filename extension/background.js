@@ -151,17 +151,8 @@ chrome.sidePanel
   .catch((error) => console.error(error));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'LANGUAGE_NOT_SUPPORTED') {
-    // 지원하지 않는 언어 메시지 저장
-    chrome.storage.local.set({
-      languageNotSupported: true,
-      currentLanguage: message.language,
-      latestCode: ''
-    });
-  }
-
   if (message.type === 'CODE_CHANGED') {
-    // 에디터에서 실시간으로 감지된 변경 - 동기화된 코드와 달라졌는지만 표시
+    // 에디터에서 실시간으로 감지된 변경 - 동기화된 코드와 달라졌는지, 언어가 지원 대상인지 표시
     getLocalState({ latestCode: '' })
       .then(({ latestCode }) => {
         const codeDirty = Boolean(message.code) && message.code !== latestCode;
@@ -172,6 +163,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (message.problemTitle) {
           nextState.problemTitle = message.problemTitle;
+        }
+        if (message.language) {
+          nextState.currentLanguage = message.language;
+          nextState.languageNotSupported = !/java/i.test(message.language);
         }
         chrome.storage.local.set(nextState);
       })
