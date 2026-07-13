@@ -42,6 +42,13 @@ public class ProblemMetaMapper {
         approach.put("expectedTimeComplexity", record.getExpectedTimeComplexity());
         approach.put("expectedSpaceComplexity", record.getExpectedSpaceComplexity());
         approach.set("alternativeApproaches", toStringArray(record.getAlternativeApproaches(), item -> item.getApproachName()));
+        ArrayNode complexityVariables = objectMapper.createArrayNode();
+        record.getComplexityVariables().forEach(item -> {
+            ObjectNode node = complexityVariables.addObject();
+            node.put("variableName", item.getVariableName());
+            node.put("description", item.getVariableDescription());
+        });
+        approach.set("complexityVariables", complexityVariables);
 
         ObjectNode solvingSupport = problem.putObject("solvingSupport");
         solvingSupport.set("keyDataStructures", toStringArray(record.getKeyDataStructures(), item -> item.getStructureName()));
@@ -66,13 +73,13 @@ public class ProblemMetaMapper {
             node.put("directionHint", item.getDirectionHint());
         });
         wrongAnswerDiagnosis.set("commonMistakes", commonMistakes);
-        wrongAnswerDiagnosis.set("fatalApproachSignals", objectMapper.createArrayNode());
+        wrongAnswerDiagnosis.set("fatalApproachSignals", toStringArray(record.getFatalApproachSignals(), item -> item.getSignalText()));
 
         ObjectNode afterSolve = problem.putObject("afterSolve");
-        afterSolve.set("edgeCases", objectMapper.createArrayNode());
-        afterSolve.set("evaluationCriteria", objectMapper.createArrayNode());
-        afterSolve.set("optimizationHints", objectMapper.createArrayNode());
-        afterSolve.set("similarProblems", objectMapper.createArrayNode());
+        afterSolve.set("edgeCases", toStringArray(record.getEdgeCases(), item -> item.getCaseText()));
+        afterSolve.set("evaluationCriteria", toStringArray(record.getEvaluationCriteria(), item -> item.getCriteriaText()));
+        afterSolve.set("optimizationHints", toStringArray(record.getOptimizationHints(), item -> item.getHintText()));
+        afterSolve.set("similarProblems", toStringArray(record.getSimilarProblems(), item -> item.getProblemName()));
 
         ObjectNode metadata = problem.putObject("metadata");
         metadata.put("version", record.getMetadataVersion());

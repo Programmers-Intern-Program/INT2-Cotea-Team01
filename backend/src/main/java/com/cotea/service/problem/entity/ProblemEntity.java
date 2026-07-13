@@ -78,4 +78,34 @@ public class ProblemEntity {
     @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
     @OrderBy("id ASC")
     private List<WrongAnswerMistakeEntity> wrongAnswerMistakes = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
+    @OrderBy("id ASC")
+    private List<ComplexityVariableEntity> complexityVariables = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
+    @OrderBy("id ASC")
+    private List<FatalApproachSignalEntity> fatalApproachSignals = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
+    @OrderBy("id ASC")
+    private List<EdgeCaseEntity> edgeCases = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
+    @OrderBy("id ASC")
+    private List<EvaluationCriteriaEntity> evaluationCriteria = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
+    @OrderBy("id ASC")
+    private List<OptimizationHintEntity> optimizationHints = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "problem_id", referencedColumnName = "problem_id", insertable = false, updatable = false)
+    @OrderBy("id ASC")
+    private List<SimilarProblemEntity> similarProblems = new ArrayList<>();
 }
