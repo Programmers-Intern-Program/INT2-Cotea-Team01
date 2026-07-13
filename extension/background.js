@@ -8,14 +8,26 @@ const DEFAULT_API_CONFIG = {
 const DEFAULT_PROBLEM_ID = 1829;
 
 function getLocalState(defaults) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(defaults, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(defaults, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(result);
+    });
   });
 }
 
 function setLocalState(nextState) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set(nextState, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(nextState, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve();
+    });
   });
 }
 
@@ -132,18 +144,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'CODE_CHANGED') {
     // 에디터에서 실시간으로 감지된 변경 - 동기화된 코드와 달라졌는지만 표시
-    getLocalState({ latestCode: '' }).then(({ latestCode }) => {
-      const codeDirty = Boolean(message.code) && message.code !== latestCode;
-      console.log('[Cotea] CODE_CHANGED 수신:', message.code ? message.code.length : 0, '자, codeDirty=', codeDirty);
-      const nextState = { codeDirty };
-      if (message.problemId != null) {
-        nextState.problemId = message.problemId;
-      }
-      if (message.problemTitle) {
-        nextState.problemTitle = message.problemTitle;
-      }
-      chrome.storage.local.set(nextState);
-    });
+    getLocalState({ latestCode: '' })
+      .then(({ latestCode }) => {
+        const codeDirty = Boolean(message.code) && message.code !== latestCode;
+        console.log('[Cotea] CODE_CHANGED 수신:', message.code ? message.code.length : 0, '자, codeDirty=', codeDirty);
+        const nextState = { codeDirty };
+        if (message.problemId != null) {
+          nextState.problemId = message.problemId;
+        }
+        if (message.problemTitle) {
+          nextState.problemTitle = message.problemTitle;
+        }
+        chrome.storage.local.set(nextState);
+      })
+      .catch((error) => {
+        console.error('[Cotea] CODE_CHANGED 상태 조회 실패:', error.message);
+      });
   }
 
   if (message.type === 'GET_PANEL_STATE') {
@@ -156,14 +172,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       apiConfig: DEFAULT_API_CONFIG,
       codeDirty: false,
     })
-      .then((state) => sendResponse(state));
+      .then((state) => sendResponse(state))
+      .catch((error) => {
+        console.error('[Cotea] GET_PANEL_STATE 조회 실패:', error.message);
+        sendResponse({ error: error.message });
+      });
     return true;
   }
 
   if (message.type === 'SET_API_CONFIG') {
     const nextConfig = { ...DEFAULT_API_CONFIG, ...(message.payload || {}) };
     setLocalState({ apiConfig: nextConfig })
-      .then(() => sendResponse({ ok: true }));
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => {
+        console.error('[Cotea] SET_API_CONFIG 저장 실패:', error.message);
+        sendResponse({ ok: false, error: error.message });
+      });
     return true;
   }
 
