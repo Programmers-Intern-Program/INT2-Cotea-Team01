@@ -9,6 +9,16 @@ function getCodeMirrorInstance() {
   return null;
 }
 
+function isEditorPresent() {
+  // 코드가 빈 문자열인 것("에디터는 찾았지만 내용이 없음")과
+  // 에디터 자체를 못 찾은 것을 구분하기 위한 존재 여부 체크
+  return Boolean(
+    document.querySelector('.CodeMirror')
+    || document.querySelector('textarea#code')
+    || document.querySelector('input[data-type="code"]')
+  );
+}
+
 function decodeHtml(htmlText) {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = htmlText;
@@ -154,13 +164,13 @@ function handleContextInvalidated() {
 }
 
 function notifyIfChanged() {
-  if (contextInvalidated) {
+  if (contextInvalidated || !isEditorPresent()) {
     return;
   }
 
   const code = getBestAvailableCode();
 
-  if (!code || code === lastKnownCode) {
+  if (code === lastKnownCode) {
     return;
   }
 
@@ -230,7 +240,7 @@ function readCodeWithRetry(tryCount, sendResponse) {
   const problemId = parseProblemId();
   const problemTitle = getProblemTitle();
 
-  if (code) {
+  if (isEditorPresent()) {
     console.log('[Cotea Content] 코드 전송:', code.length, '자,', language);
     sendResponse({ code, language, problemId, problemTitle });
     return;
