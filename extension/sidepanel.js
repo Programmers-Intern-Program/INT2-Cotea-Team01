@@ -54,6 +54,8 @@ const state = {
   syncing: false,
   codeDirty: false,
   onProgrammers: true,
+  languageNotSupported: false,
+  currentLanguage: 'Java',
 };
 
 const PROGRAMMERS_HOST = 'school.programmers.co.kr';
@@ -786,6 +788,8 @@ async function initialize() {
     state.problemTitle = response && response.problemTitle ? response.problemTitle : null;
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
     state.codeDirty = Boolean(response && response.codeDirty);
+    state.languageNotSupported = Boolean(response && response.languageNotSupported);
+    state.currentLanguage = (response && response.currentLanguage) || 'Java';
   } catch (error) {
     state.messages.push({
       id: Date.now() + 3,
@@ -835,6 +839,23 @@ async function initialize() {
 
     if (changes.codeDirty) {
       state.codeDirty = Boolean(changes.codeDirty.newValue);
+    }
+
+    if (changes.currentLanguage) {
+      state.currentLanguage = changes.currentLanguage.newValue || 'Java';
+    }
+
+    if (changes.languageNotSupported) {
+      const nextLanguageNotSupported = Boolean(changes.languageNotSupported.newValue);
+      if (nextLanguageNotSupported && !state.languageNotSupported) {
+        state.messages.push({
+          id: Date.now(),
+          role: 'ai',
+          text: `현재 선택 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요.`,
+          timestamp: nowLabel(),
+        });
+      }
+      state.languageNotSupported = nextLanguageNotSupported;
     }
 
     renderShell();

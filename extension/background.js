@@ -6,16 +6,29 @@ const DEFAULT_API_CONFIG = {
 };
 
 const DEFAULT_PROBLEM_ID = 1829;
+const HINT_API_TIMEOUT_MS = 20000;
 
 function getLocalState(defaults) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(defaults, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(defaults, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(result);
+    });
   });
 }
 
 function setLocalState(nextState) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set(nextState, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(nextState, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve();
+    });
   });
 }
 
@@ -76,6 +89,9 @@ function buildHintRequestBody(message) {
 async function requestHintFromApi(message) {
   const { apiConfig } = await getLocalState({ apiConfig: DEFAULT_API_CONFIG });
   const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
+  if (!mergedConfig.endpoint) {
+    mergedConfig.endpoint = DEFAULT_API_CONFIG.endpoint;
+  }
   const hintRequest = message.hintRequest || {};
   const questionText = hintRequest.questionText || message.question || '';
 
@@ -88,11 +104,25 @@ async function requestHintFromApi(message) {
     ? mergedConfig.endpoint
     : `/${mergedConfig.endpoint}`;
 
-  const response = await fetch(`${normalizedBaseUrl}${normalizedEndpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildHintRequestBody(message)),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), HINT_API_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(`${normalizedBaseUrl}${normalizedEndpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildHintRequestBody(message)),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('API 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let detail = '';
@@ -121,29 +151,28 @@ chrome.sidePanel
   .catch((error) => console.error(error));
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'LANGUAGE_NOT_SUPPORTED') {
-    // 지원하지 않는 언어 메시지 저장
-    chrome.storage.local.set({
-      languageNotSupported: true,
-      currentLanguage: message.language,
-      latestCode: ''
-    });
-  }
-
   if (message.type === 'CODE_CHANGED') {
-    // 에디터에서 실시간으로 감지된 변경 - 동기화된 코드와 달라졌는지만 표시
-    getLocalState({ latestCode: '' }).then(({ latestCode }) => {
-      const codeDirty = Boolean(message.code) && message.code !== latestCode;
-      console.log('[Cotea] CODE_CHANGED 수신:', message.code ? message.code.length : 0, '자, codeDirty=', codeDirty);
-      const nextState = { codeDirty };
-      if (message.problemId != null) {
-        nextState.problemId = message.problemId;
-      }
-      if (message.problemTitle) {
-        nextState.problemTitle = message.problemTitle;
-      }
-      chrome.storage.local.set(nextState);
-    });
+    // 에디터에서 실시간으로 감지된 변경 - 동기화된 코드와 달라졌는지, 언어가 지원 대상인지 표시
+    getLocalState({ latestCode: '' })
+      .then(({ latestCode }) => {
+        const codeDirty = Boolean(message.code) && message.code !== latestCode;
+        console.log('[Cotea] CODE_CHANGED 수신:', message.code ? message.code.length : 0, '자, codeDirty=', codeDirty);
+        const nextState = { codeDirty };
+        if (message.problemId != null) {
+          nextState.problemId = message.problemId;
+        }
+        if (message.problemTitle) {
+          nextState.problemTitle = message.problemTitle;
+        }
+        if (message.language) {
+          nextState.currentLanguage = message.language;
+          nextState.languageNotSupported = !/java/i.test(message.language);
+        }
+        chrome.storage.local.set(nextState);
+      })
+      .catch((error) => {
+        console.error('[Cotea] CODE_CHANGED 상태 조회 실패:', error.message);
+      });
   }
 
   if (message.type === 'GET_PANEL_STATE') {
@@ -156,14 +185,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       apiConfig: DEFAULT_API_CONFIG,
       codeDirty: false,
     })
-      .then((state) => sendResponse(state));
+      .then((state) => sendResponse(state))
+      .catch((error) => {
+        console.error('[Cotea] GET_PANEL_STATE 조회 실패:', error.message);
+        sendResponse({ error: error.message });
+      });
     return true;
   }
 
   if (message.type === 'SET_API_CONFIG') {
     const nextConfig = { ...DEFAULT_API_CONFIG, ...(message.payload || {}) };
     setLocalState({ apiConfig: nextConfig })
-      .then(() => sendResponse({ ok: true }));
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => {
+        console.error('[Cotea] SET_API_CONFIG 저장 실패:', error.message);
+        sendResponse({ ok: false, error: error.message });
+      });
     return true;
   }
 

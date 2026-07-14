@@ -102,6 +102,41 @@ public class PromptAssembler {
         return sb.toString();
     }
 
+    public String buildOffTopicSystemPrompt(JsonNode policy) {
+        JsonNode offTopic = policy.path("offTopicPolicy");
+        JsonNode responseFormat = offTopic.path("responseFormat");
+        if (!responseFormat.isObject()) {
+            responseFormat = policy.path("responseFormat");
+        }
+
+        StringBuilder sb = new StringBuilder();
+        String identity = offTopic.path("tutorIdentity").asText(policy.path("tutorIdentity").asText());
+        sb.append(identity).append("\n\n");
+        sb.append("## 전처리 범위 밖 질문 정책\n");
+        offTopic.path("behavior").forEach(rule -> sb.append("- ").append(rule.asText()).append('\n'));
+        sb.append("\n## 절대 제공하지 말 것\n");
+        offTopic.path("forbid").forEach(item -> sb.append("- ").append(item.asText()).append('\n'));
+        sb.append("\n## 응답 형식\n")
+                .append("- 톤: ").append(responseFormat.path("tone").asText("친절하지만 짧게")).append('\n')
+                .append("- 최대 ").append(responseFormat.path("maxParagraphs").asInt(2)).append("문단\n")
+                .append("- 마지막에 되묻는 질문 포함: ")
+                .append(responseFormat.path("preferQuestion").asBoolean(true));
+        return sb.toString();
+    }
+
+    public String buildOffTopicUserMessage(HintRequest request, String problemTitle, String problemLevel) {
+        String question = questionResolver.resolve(request);
+        StringBuilder sb = new StringBuilder();
+        sb.append("현재 화면 문제: ").append(problemTitle == null ? "" : problemTitle);
+        if (problemLevel != null && !problemLevel.isBlank()) {
+            sb.append(" (").append(problemLevel).append(')');
+        }
+        sb.append("\nstage: ").append(request.getStage()).append("\n\n");
+        sb.append("※ 이 요청은 문제 전처리 메타 없이 처리한다. 문제 풀이 정답·힌트 메타를 추측하지 말 것.\n\n");
+        sb.append("## 사용자 질문\n").append(question);
+        return sb.toString();
+    }
+
     private void appendSubmissionResultGuidance(
             StringBuilder sb,
             JsonNode policy,

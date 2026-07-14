@@ -14,6 +14,11 @@ public class HintResponse {
     private final String stage;
     private final Integer hintLevel;
 
+    /** RELATED | OFF_TOPIC — dryRun/관측용 */
+    private final String route;
+    /** claude | openai | claude_fallback — dryRun/관측용 */
+    private final String llmProvider;
+
     private final Boolean dryRun;
     private final List<String> tags;
     private final String systemPrompt;

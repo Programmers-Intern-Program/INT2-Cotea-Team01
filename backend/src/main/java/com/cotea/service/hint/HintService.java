@@ -1,6 +1,7 @@
 package com.cotea.service.hint;
 
 import com.cotea.client.LlmClient;
+import com.cotea.config.CoteaProperties;
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.controller.dto.HintResponse;
 import com.cotea.exception.CoteaException;
@@ -13,10 +14,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class HintService {
 
     private final PromptPolicyLoader promptPolicyLoader;
@@ -30,6 +33,9 @@ public class HintService {
     private final HintRequestValidator hintRequestValidator;
     private final HintAnswerGuardrail hintAnswerGuardrail;
     private final HintSelfReviewService hintSelfReviewService;
+    private final OffTopicQuestionClassifier offTopicQuestionClassifier;
+    private final OffTopicLlmRouter offTopicLlmRouter;
+    private final CoteaProperties coteaProperties;
 
     public HintResponse generate(HintRequest request) {
         hintRequestValidator.validate(request);
@@ -39,8 +45,24 @@ public class HintService {
         int hintLevel = hintLevelResolver.resolve(request, policy);
         request.setHintLevel(hintLevel);
 
-        List<String> tags = problemContextSelector.extractTags(problem);
         String question = questionResolver.resolve(request);
+        boolean offTopic = coteaProperties.getOffTopic().isEnabled()
+                && offTopicQuestionClassifier.isOffTopic(request, question);
+
+        if (offTopic) {
+            return generateOffTopic(request, policy, problem, hintLevel, question);
+        }
+        return generateRelated(request, policy, problem, hintLevel, question);
+    }
+
+    private HintResponse generateRelated(
+            HintRequest request,
+            JsonNode policy,
+            JsonNode problem,
+            int hintLevel,
+            String question
+    ) {
+        List<String> tags = problemContextSelector.extractTags(problem);
         ObjectNode problemContext = problemContextSelector.select(problem, policy, request, hintLevel);
         List<RagChunk> ragChunks = ragRetrievalService.retrieve(tags, hintLevel, question);
 
@@ -55,6 +77,8 @@ public class HintService {
         if (Boolean.TRUE.equals(request.getDryRun())) {
             return HintResponse.builder()
                     .dryRun(true)
+                    .route("RELATED")
+                    .llmProvider("claude")
                     .stage(request.getStage())
                     .hintLevel(hintLevel)
                     .tags(tags)
@@ -69,22 +93,91 @@ public class HintService {
                 request.getConversationHistory(),
                 userMessage
         );
-        GuardrailResult guardrail = hintAnswerGuardrail.inspect(responseText, request, hintLevel);
-        if (guardrail.needsReview()) {
-            responseText = hintSelfReviewService.reviewAndFix(
-                    policy,
-                    request,
-                    hintLevel,
-                    userMessage,
-                    responseText,
-                    guardrail
-            );
-        }
+        responseText = applyGuardrailIfNeeded(policy, request, hintLevel, userMessage, responseText);
 
         return HintResponse.builder()
                 .responseText(responseText)
+                .route("RELATED")
+                .llmProvider("claude")
                 .stage(request.getStage())
                 .hintLevel(hintLevel)
                 .build();
+    }
+
+    private HintResponse generateOffTopic(
+            HintRequest request,
+            JsonNode policy,
+            JsonNode problem,
+            int hintLevel,
+            String question
+    ) {
+        String title = problem.path("source").path("title").asText("");
+        String level = problem.path("source").path("level").asText("");
+        String systemPrompt = promptAssembler.buildOffTopicSystemPrompt(policy);
+        String userMessage = promptAssembler.buildOffTopicUserMessage(request, title, level);
+
+        log.info("[OFF_TOPIC] problemId={} question={}", request.getProblemId(), abbreviate(question));
+
+        if (Boolean.TRUE.equals(request.getDryRun())) {
+            return HintResponse.builder()
+                    .dryRun(true)
+                    .route("OFF_TOPIC")
+                    .llmProvider(offTopicLlmRouter.preferredProviderForDryRun())
+                    .stage(request.getStage())
+                    .hintLevel(hintLevel)
+                    .systemPrompt(systemPrompt)
+                    .userMessage(userMessage)
+                    .ragChunkCount(0)
+                    .build();
+        }
+
+        OffTopicLlmRouter.Result result = offTopicLlmRouter.generate(
+                systemPrompt,
+                request.getConversationHistory(),
+                userMessage
+        );
+        String responseText = applyGuardrailIfNeeded(
+                policy,
+                request,
+                hintLevel,
+                userMessage,
+                result.getResponseText()
+        );
+
+        return HintResponse.builder()
+                .responseText(responseText)
+                .route("OFF_TOPIC")
+                .llmProvider(result.getLlmProvider())
+                .stage(request.getStage())
+                .hintLevel(hintLevel)
+                .build();
+    }
+
+    private String applyGuardrailIfNeeded(
+            JsonNode policy,
+            HintRequest request,
+            int hintLevel,
+            String userMessage,
+            String responseText
+    ) {
+        GuardrailResult guardrail = hintAnswerGuardrail.inspect(responseText, request, hintLevel);
+        if (!guardrail.needsReview()) {
+            return responseText;
+        }
+        return hintSelfReviewService.reviewAndFix(
+                policy,
+                request,
+                hintLevel,
+                userMessage,
+                responseText,
+                guardrail
+        );
+    }
+
+    private String abbreviate(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.length() <= 80 ? text : text.substring(0, 80) + "...";
     }
 }
