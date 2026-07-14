@@ -66,6 +66,7 @@ function buildHintRequestBody(message) {
     stage: hintRequest.stage || 'BEFORE_SOLVE',
     questionType: hintRequest.questionType || 'FREE_TEXT',
     userCode: hintRequest.userCode ?? '',
+    language: hintRequest.language || 'Unknown',
     conversationHistory: Array.isArray(hintRequest.conversationHistory)
       ? hintRequest.conversationHistory
       : [],

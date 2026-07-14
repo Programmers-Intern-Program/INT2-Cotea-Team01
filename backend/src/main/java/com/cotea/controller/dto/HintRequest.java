@@ -27,6 +27,7 @@ public class HintRequest {
     private String buttonId;
     private String questionText;
     private String userCode;
+    private String language;
     private String submissionResult;
     private List<ConversationMessage> conversationHistory = new ArrayList<>();
 
