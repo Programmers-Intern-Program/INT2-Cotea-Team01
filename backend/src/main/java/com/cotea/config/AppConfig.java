@@ -15,4 +15,11 @@ public class AppConfig {
                 .baseUrl(properties.getClaude().getBaseUrl())
                 .build();
     }
+
+    @Bean
+    WebClient openAiWebClient(CoteaProperties properties) {
+        return WebClient.builder()
+                .baseUrl(properties.getOpenAi().getBaseUrl())
+                .build();
+    }
 }

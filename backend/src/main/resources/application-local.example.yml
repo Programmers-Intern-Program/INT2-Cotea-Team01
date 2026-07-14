@@ -5,5 +5,19 @@ cotea:
   claude:
     api-key: sk-ant-api03-여기에_본인_키
     # model: claude-sonnet-4-6  # 선택
+  openai:
+    api-key: sk-여기에_OpenAI_키   # 선택. 없으면 off-topic은 Claude fallback
+    model: gpt-4o-mini
   problem-meta:
     directory: ../rag/problems
+  off-topic:
+    enabled: true
+
+# 선택: 로컬 MySQL 문제 메타데이터 사용
+# spring.datasource.url 이 있으면 DB를 먼저 조회하고, 실패 시 rag/problems JSON으로 fallback 합니다.
+spring:
+  datasource:
+    url: ${LOCAL_DB_URL:jdbc:mysql://127.0.0.1:3306/cotea?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${LOCAL_DB_USERNAME:root}
+    password: ${LOCAL_DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
