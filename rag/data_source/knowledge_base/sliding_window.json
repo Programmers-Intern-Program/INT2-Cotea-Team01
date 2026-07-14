@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "O(N)이라 N이 수백만이어도 안전하다."
+  "applicable_scale": "O(N)이라 N이 수백만이어도 안전하다.",
+  "distinguishing_from": [
+    { "ref": "two_pointer", "signal": "정렬을 전제로 양 끝에서 좁혀가며 쌍을 찾는다면 two_pointer다. 정렬 여부와 무관하게 '연속된' 부분 구간을 다룬다면 sliding_window가 더 맞다." },
+    { "ref": "prefix_sum", "signal": "구간이 고정되어 있고 반복적으로 조회만 하면 된다면 prefix_sum이 더 단순하다. 구간 자체가 조건에 따라 움직여야 한다면 sliding_window가 필요하다." }
+  ],
+  "code_signals": {
+    "keywords": ["windowSum", "windowCount", "start", "end"],
+    "exclusion_keywords": [],
+    "keyword_confidence": "low",
+    "confidence_note": "변수명 관례에 의존하며, start/end는 다른 유형에서도 흔히 쓰여 구분력이 약하다."
+  }
 }

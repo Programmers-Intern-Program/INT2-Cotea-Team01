@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "격자 크기에 비례하는 상태 공간(R×C)이라, 격자가 수천×수천을 넘으면 메모리도 함께 고려해야 한다."
+  "applicable_scale": "격자 크기에 비례하는 상태 공간(R×C)이라, 격자가 수천×수천을 넘으면 메모리도 함께 고려해야 한다.",
+  "distinguishing_from": [
+    { "ref": "dp_general", "signal": "격자/경로 구조가 아니라 더 일반적인 부분 문제 재활용이라면 dp_general을 참고해야 한다." },
+    { "ref": "simulation_grid", "signal": "'경로의 수/최적값'이 아니라 격자 위 상태 변화 자체(이동, 회전, 확산)를 그대로 따라가야 하는 문제라면 simulation_grid가 더 맞다." }
+  ]
 }

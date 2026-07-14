@@ -16,5 +16,12 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "상태 개수 × 상태 전이 비용이 시간 제약 안에 들어오는지가 기준이다. 상태 개수가 N²이면 N이 수천 이하일 때 안전하다."
+  "applicable_scale": "상태 개수 × 상태 전이 비용이 시간 제약 안에 들어오는지가 기준이다. 상태 개수가 N²이면 N이 수천 이하일 때 안전하다.",
+  "distinguishing_from": [
+    { "ref": "bruteforcing", "signal": "같은 부분 문제가 반복 계산되지 않는다면 굳이 dp가 필요 없고 bruteforcing으로 충분할 수 있다." },
+    { "ref": "greedy_general", "signal": "매 단계의 최선 선택이 항상 전체 최적으로 이어진다는 것이 증명 가능하다면 greedy_general이 더 단순한 접근이다. 증명이 안 된다면 dp_general을 고려해야 한다." },
+    { "ref": "dp_knapsack", "signal": "제한된 용량/예산 안에서 항목을 선택하는 형태라면 dp_knapsack이 더 구체적인 접근이다." },
+    { "ref": "dp_path_counting", "signal": "격자나 그래프에서 경로의 수를 세거나 경로상의 최적값을 구하는 형태라면 dp_path_counting이 더 구체적인 접근이다." },
+    { "ref": "dp_subsequence", "signal": "수열에서 순서를 유지한 부분수열에 대한 조건을 다룬다면 dp_subsequence가 더 구체적인 접근이다." }
+  ]
 }

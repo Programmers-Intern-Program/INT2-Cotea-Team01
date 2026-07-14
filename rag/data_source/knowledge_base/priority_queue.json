@@ -16,5 +16,17 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "삽입/삭제가 O(log N)이라, N이 수십만이어도 안전하다."
+  "applicable_scale": "삽입/삭제가 O(log N)이라, N이 수십만이어도 안전하다.",
+  "distinguishing_from": [
+    { "ref": "sorting", "signal": "값 전체를 한 번만 정렬하면 충분하다면 sorting으로 충분하다. 삽입/삭제가 반복되며 그때그때 최댓값/최솟값을 꺼내야 한다면 priority_queue가 필요하다." }
+  ],
+  "often_combined_with": [
+    { "ref": "bfs", "note": "가중치가 있는 그래프에서 최단 경로를 구할 때(다익스트라 등) bfs의 확장 형태로 결합된다." }
+  ],
+  "code_signals": {
+    "keywords": ["PriorityQueue<"],
+    "exclusion_keywords": [],
+    "keyword_confidence": "high",
+    "confidence_note": "PriorityQueue 선언 자체가 명확한 신호다."
+  }
 }

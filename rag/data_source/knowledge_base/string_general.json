@@ -16,5 +16,8 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "문자열 길이와 반복 횟수의 곱이 커지는 경우(예: 반복문 안에서 문자열 연결) 주의가 필요하다. 문자열 길이가 수만 이상이면 StringBuilder 없이는 위험하다."
+  "applicable_scale": "문자열 길이와 반복 횟수의 곱이 커지는 경우(예: 반복문 안에서 문자열 연결) 주의가 필요하다. 문자열 길이가 수만 이상이면 StringBuilder 없이는 위험하다.",
+  "distinguishing_from": [
+    { "ref": "string_pattern_basic", "signal": "문자열 자체를 분해/재조합/변형하는 것이 아니라 특정 패턴의 존재 여부/등장 횟수를 찾는 것이 목적이라면 string_pattern_basic이 더 구체적인 접근이다." }
+  ]
 }

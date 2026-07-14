@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "가지치기 효율에 따라 실제 성능이 크게 갈린다. 최악의 경우 완전탐색과 같아지므로 bruteforcing과 유사한 규모 기준을 참고 기준으로 삼되, 가지치기가 강하면 더 큰 N도 가능하다."
+  "applicable_scale": "가지치기 효율에 따라 실제 성능이 크게 갈린다. 최악의 경우 완전탐색과 같아지므로 bruteforcing과 유사한 규모 기준을 참고 기준으로 삼되, 가지치기가 강하면 더 큰 N도 가능하다.",
+  "distinguishing_from": [
+    { "ref": "dfs", "signal": "가지치기(조건에 안 맞으면 더 진행하지 않고 되돌리기) 없이 모든 경로를 그대로 탐색한다면 dfs가 더 기본적인 접근이다. backtracking은 dfs에 '선택 취소' 단계가 추가된 형태다." },
+    { "ref": "bruteforcing", "signal": "가지치기 없이 모든 경우를 그대로 다 만든다면 bruteforcing에 가깝다. 중간에 조건을 만족하지 않는 경로를 일찍 포기한다면 backtracking이다." }
+  ],
+  "code_signals": {
+    "keywords": [],
+    "exclusion_keywords": [],
+    "keyword_confidence": "low",
+    "confidence_note": "'선택 후 재귀 호출 후 선택 취소'는 코드 구조(add/remove 쌍, 재귀 전후의 상태 되돌리기)라서 문자열 키워드로는 잡기 어렵다."
+  }
 }

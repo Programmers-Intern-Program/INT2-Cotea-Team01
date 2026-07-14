@@ -16,5 +16,17 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "정점 V, 간선 E일 때 인접 리스트 기준 O(V+E). V, E가 각각 10만 이하면 안전, 그 이상이면 자료구조 선택(행렬 대신 리스트)이 중요해진다."
+  "applicable_scale": "정점 V, 간선 E일 때 인접 리스트 기준 O(V+E). V, E가 각각 10만 이하면 안전, 그 이상이면 자료구조 선택(행렬 대신 리스트)이 중요해진다.",
+  "distinguishing_from": [
+    { "ref": "graph_connectivity", "signal": "연결 여부/그룹 개수 자체가 목적이라면 graph_connectivity가 더 구체적인 접근이다." },
+    { "ref": "dfs", "signal": "모든 경로를 다 확인하는 구체적인 순회 방식이 필요하면 dfs를 참고해야 한다." },
+    { "ref": "bfs", "signal": "최단 거리/최소 단계를 구하는 구체적인 순회 방식이 필요하면 bfs를 참고해야 한다." },
+    { "ref": "trees_general", "signal": "사이클이 없고 부모-자식 관계가 명확한 계층 구조라면 trees_general이 더 구체적인 접근이다." }
+  ],
+  "code_signals": {
+    "keywords": ["List<List<Integer>>", "List<Integer>["],
+    "exclusion_keywords": [],
+    "keyword_confidence": "medium",
+    "confidence_note": "인접 리스트 선언은 흔한 신호지만 트리 문제에서도 동일하게 쓰일 수 있어 확정적이지 않다."
+  }
 }

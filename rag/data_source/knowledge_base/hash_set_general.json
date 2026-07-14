@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "N이 최대 10만~100만이어도 O(1) 평균 조회라 안전하다. 다만 해시 충돌이 잦은 극단적 케이스는 예외."
+  "applicable_scale": "N이 최대 10만~100만이어도 O(1) 평균 조회라 안전하다. 다만 해시 충돌이 잦은 극단적 케이스는 예외.",
+  "distinguishing_from": [
+    { "ref": "hash_set_frequency", "signal": "등장 횟수 자체를 세고 비교해야 한다면 hash_set_frequency가 더 정확하다." },
+    { "ref": "array_general", "signal": "값의 범위가 작고 인덱스로 바로 접근 가능하다면 배열(array_general)로도 같은 효과를 더 단순하게 낼 수 있다." }
+  ],
+  "code_signals": {
+    "keywords": ["HashSet<", ".contains("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "high",
+    "confidence_note": "HashSet 선언과 contains 호출은 존재 여부 확인의 명확한 신호다."
+  }
 }

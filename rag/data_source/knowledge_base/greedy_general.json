@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "규모보다 '그리디 선택이 최적임을 증명할 수 있는가'가 기준이다. 증명 없이 규모만 보고 그리디를 택하면 안 된다."
+  "applicable_scale": "규모보다 '그리디 선택이 최적임을 증명할 수 있는가'가 기준이다. 증명 없이 규모만 보고 그리디를 택하면 안 된다.",
+  "distinguishing_from": [
+    { "ref": "dp_general", "signal": "매 단계 최선의 선택이 항상 전체 최적으로 이어진다고 증명하기 어렵다면, greedy_general 대신 dp_general로 모든 경우를 저장하며 접근해야 한다." },
+    { "ref": "greedy_sort_based", "signal": "정렬 후 순서대로 선택하는 구체적인 절차가 필요하다면 greedy_sort_based가 더 구체적인 접근이다." }
+  ]
 }

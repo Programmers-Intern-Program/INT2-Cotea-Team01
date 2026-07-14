@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "N이 20 이하(2^N 조합) 또는 N이 수백 이하(N² 이하)일 때만 안전하다. N이 1000을 넘으면 대부분 시간초과 위험이 크다."
+  "applicable_scale": "N이 20 이하(2^N 조합) 또는 N이 수백 이하(N² 이하)일 때만 안전하다. N이 1000을 넘으면 대부분 시간초과 위험이 크다.",
+  "distinguishing_from": [
+    { "ref": "backtracking", "signal": "조건에 안 맞는 경로를 중간에 포기(가지치기)할 수 있다면 backtracking이 더 효율적이다. 가지치기 없이 끝까지 다 만든다면 bruteforcing이다." },
+    { "ref": "dp_general", "signal": "같은 부분 문제가 반복해서 계산된다면 dp_general로 최적화할 수 있는지 먼저 검토해야 한다." }
+  ]
 }

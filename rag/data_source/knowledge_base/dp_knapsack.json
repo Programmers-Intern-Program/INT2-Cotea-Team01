@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "상태 공간이 '아이템 수 × 용량'이라, 용량이 매우 크면(예: 10^9) 배열 기반 DP 자체가 불가능해 다른 접근이 필요하다."
+  "applicable_scale": "상태 공간이 '아이템 수 × 용량'이라, 용량이 매우 크면(예: 10^9) 배열 기반 DP 자체가 불가능해 다른 접근이 필요하다.",
+  "distinguishing_from": [
+    { "ref": "dp_general", "signal": "용량/예산 제약과 선택 문제가 아니라 더 일반적인 부분 문제 재활용 구조라면 dp_general을 참고해야 한다." },
+    { "ref": "greedy_general", "signal": "단가(가치/무게 비율)가 높은 순으로 그리디하게 선택해도 항상 최적이 되는 경우(분할 가능한 배낭 등)라면 greedy_general이 더 단순하다. 각 항목이 쪼갤 수 없는 단위라면 dp_knapsack이 필요하다." }
+  ]
 }
