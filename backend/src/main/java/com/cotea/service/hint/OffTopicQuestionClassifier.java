@@ -20,7 +20,7 @@ public class OffTopicQuestionClassifier {
     );
 
     private static final Pattern UNRELATED = Pattern.compile(
-            ".*(점심|저녁|날씨|날씨|게임\\s*추천|영화|노래|연예|주식|비트코인|"
+            ".*(점심|저녁|날씨|게임\\s*추천|영화|노래|연예|주식|비트코인|"
                     + "사랑|연애|오늘\\s*뭐\\s*해|심심해|농담).*",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );

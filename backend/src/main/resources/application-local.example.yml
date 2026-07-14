@@ -7,7 +7,7 @@ cotea:
     # model: claude-sonnet-4-6  # 선택
   openai:
     api-key: sk-여기에_OpenAI_키   # 선택. 없으면 off-topic은 Claude fallback
-    # model: gpt-4o-mini
+    model: gpt-4o-mini
   problem-meta:
     directory: ../rag/problems
   off-topic:
