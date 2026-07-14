@@ -71,6 +71,11 @@ public class PromptAssembler {
                 .append("- 최대 ").append(responseFormat.path("maxParagraphs").asInt(3)).append("문단\n")
                 .append("- 마지막에 되묻는 질문 포함: ")
                 .append(responseFormat.path("preferQuestion").asBoolean(true));
+        JsonNode structure = responseFormat.path("structure");
+        if (structure.isArray() && structure.size() > 0) {
+            sb.append("\n- 응답 구조:\n");
+            structure.forEach(item -> sb.append("  - ").append(item.asText()).append('\n'));
+        }
         return sb.toString();
     }
 

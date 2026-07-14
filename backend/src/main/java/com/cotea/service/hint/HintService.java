@@ -28,6 +28,8 @@ public class HintService {
     private final LlmClient llmClient;
     private final QuestionResolver questionResolver;
     private final HintRequestValidator hintRequestValidator;
+    private final HintAnswerGuardrail hintAnswerGuardrail;
+    private final HintSelfReviewService hintSelfReviewService;
 
     public HintResponse generate(HintRequest request) {
         hintRequestValidator.validate(request);
@@ -67,6 +69,17 @@ public class HintService {
                 request.getConversationHistory(),
                 userMessage
         );
+        GuardrailResult guardrail = hintAnswerGuardrail.inspect(responseText, request, hintLevel);
+        if (guardrail.needsReview()) {
+            responseText = hintSelfReviewService.reviewAndFix(
+                    policy,
+                    request,
+                    hintLevel,
+                    userMessage,
+                    responseText,
+                    guardrail
+            );
+        }
 
         return HintResponse.builder()
                 .responseText(responseText)
