@@ -52,6 +52,7 @@
 | buttonId            | string        | questionType=BUTTON일 때 Y    | 사전 정의 버튼 질문 ID. **목록은 [`button-catalog.md`](./button-catalog.md) 참고** |
 | questionText        | string        | questionType=FREE_TEXT일 때 Y | 사용자가 직접 입력한 질문                                                                                                     |
 | userCode            | string        | Y                             | 현재 에디터에 작성된 코드 전체                                                                                                |
+| language            | string        | Y (없으면 `"Unknown"`)        | 에디터에서 감지된 코드 언어 (예: `"Java"`). 현재는 Java만 정식 지원하며, 향후 지식 베이스 `code_signals` 매칭 등 언어별 분기에 사용 예정              |
 | conversationHistory | array         | Y (없으면 빈 배열)            | 지금까지의 대화. `[{ role: "user"                                                                                             | "assistant", text: string }]` |
 | submissionResult    | string (enum) | stage=WRONG_ANSWER일 때 Y     | 예: `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `RUNTIME_ERROR`. **프로그래머스 DOM에서 실제로 뽑아낼 수 있는 값인지 검증 필요**   |
 

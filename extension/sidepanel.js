@@ -122,6 +122,7 @@ function buildHintRequest(questionText, chipLabel) {
     problemId,
     stage,
     userCode: state.latestCode || '',
+    language: state.currentLanguage || 'Unknown',
     conversationHistory: buildConversationHistory(),
   };
 
