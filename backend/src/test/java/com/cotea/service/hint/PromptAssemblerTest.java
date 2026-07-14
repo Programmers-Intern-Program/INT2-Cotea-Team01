@@ -65,6 +65,17 @@ class PromptAssemblerTest {
     }
 
     @Test
+    void includesResponseStructureGuidance() {
+        HintRequest request = wrongAnswerRequest("WRONG_ANSWER", "why_wrong");
+
+        String systemPrompt = assembler.buildSystemPrompt(policy, 2, request);
+
+        assertThat(systemPrompt).contains("응답 구조");
+        assertThat(systemPrompt).contains("핵심 힌트 1~2문단");
+        assertThat(systemPrompt).contains("마지막에 되묻는 질문 1문장");
+    }
+
+    @Test
     void omitsUserCodeDiagnosisGuidanceWhenCodeMissing() {
         HintRequest request = wrongAnswerRequest("WRONG_ANSWER", "why_wrong");
 

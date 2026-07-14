@@ -30,15 +30,15 @@ public class HintService {
     private final RagRetrievalService ragRetrievalService;
     private final LlmClient llmClient;
     private final QuestionResolver questionResolver;
+    private final HintRequestValidator hintRequestValidator;
+    private final HintAnswerGuardrail hintAnswerGuardrail;
+    private final HintSelfReviewService hintSelfReviewService;
     private final OffTopicQuestionClassifier offTopicQuestionClassifier;
     private final OffTopicLlmRouter offTopicLlmRouter;
     private final CoteaProperties coteaProperties;
 
     public HintResponse generate(HintRequest request) {
-        if (request.getProblemId() == null) {
-            throw new CoteaException("MISSING_PROBLEM_ID", "problemId가 필요합니다.", 400);
-        }
-        validateStage(request.getStage());
+        hintRequestValidator.validate(request);
 
         JsonNode policy = promptPolicyLoader.getPolicy();
         JsonNode problem = problemMetaService.load(request.getProblemId());
@@ -93,6 +93,7 @@ public class HintService {
                 request.getConversationHistory(),
                 userMessage
         );
+        responseText = applyGuardrailIfNeeded(policy, request, hintLevel, userMessage, responseText);
 
         return HintResponse.builder()
                 .responseText(responseText)
@@ -135,9 +136,16 @@ public class HintService {
                 request.getConversationHistory(),
                 userMessage
         );
+        String responseText = applyGuardrailIfNeeded(
+                policy,
+                request,
+                hintLevel,
+                userMessage,
+                result.getResponseText()
+        );
 
         return HintResponse.builder()
-                .responseText(result.getResponseText())
+                .responseText(responseText)
                 .route("OFF_TOPIC")
                 .llmProvider(result.getLlmProvider())
                 .stage(request.getStage())
@@ -145,10 +153,25 @@ public class HintService {
                 .build();
     }
 
-    private void validateStage(String stage) {
-        if (!List.of("BEFORE_SOLVE", "SOLVING", "WRONG_ANSWER", "AFTER_SOLVE").contains(stage)) {
-            throw new CoteaException("INVALID_STAGE", "stage 값이 올바르지 않습니다.", 400);
+    private String applyGuardrailIfNeeded(
+            JsonNode policy,
+            HintRequest request,
+            int hintLevel,
+            String userMessage,
+            String responseText
+    ) {
+        GuardrailResult guardrail = hintAnswerGuardrail.inspect(responseText, request, hintLevel);
+        if (!guardrail.needsReview()) {
+            return responseText;
         }
+        return hintSelfReviewService.reviewAndFix(
+                policy,
+                request,
+                hintLevel,
+                userMessage,
+                responseText,
+                guardrail
+        );
     }
 
     private String abbreviate(String text) {
