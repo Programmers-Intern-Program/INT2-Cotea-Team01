@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "stack과 동일하게 삽입/삭제가 O(1)이라 대규모 N에서도 안전하다."
+  "applicable_scale": "stack과 동일하게 삽입/삭제가 O(1)이라 대규모 N에서도 안전하다.",
+  "distinguishing_from": [
+    { "ref": "stack", "signal": "가장 최근에 넣은 값부터 꺼내야 한다면(LIFO) stack이 맞다. 넣은 순서대로 꺼내야 한다면(FIFO) queue_deque가 맞다." },
+    { "ref": "bfs", "signal": "단순 자료구조 활용이 아니라 그래프/격자를 너비 우선으로 탐색하는 것이 목적이라면 bfs 문서를 참고해야 한다." }
+  ],
+  "code_signals": {
+    "keywords": ["Queue<", "ArrayDeque<", ".poll(", ".offer("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "high",
+    "confidence_note": "Queue/ArrayDeque 선언은 명확한 신호다."
+  }
 }

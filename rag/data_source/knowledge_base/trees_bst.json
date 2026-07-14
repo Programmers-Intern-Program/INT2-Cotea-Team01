@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "균형이 깨진 BST는 최악의 경우 O(N)까지 저하되므로, N이 크고 삽입 순서가 정렬되어 있으면 위험하다."
+  "applicable_scale": "균형이 깨진 BST는 최악의 경우 O(N)까지 저하되므로, N이 크고 삽입 순서가 정렬되어 있으면 위험하다.",
+  "distinguishing_from": [
+    { "ref": "trees_general", "signal": "왼쪽<오른쪽 정렬 성질을 전제하지 않는 일반적인 트리 순회/집계라면 trees_general을 참고해야 한다." },
+    { "ref": "binary_search", "signal": "트리 구조가 아니라 정렬된 배열에서 값을 찾는 것이라면 binary_search가 더 맞다. BST는 트리 형태의 자료구조 자체를 다룬다는 점이 다르다." }
+  ]
 }

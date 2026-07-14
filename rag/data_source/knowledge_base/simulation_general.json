@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "반복 횟수 × 매 단계 처리 비용이 시간 제약을 넘는지가 기준이다. 반복 횟수 자체가 N이 아니라 문제에 명시된 '턴 수'인 경우가 많으니 별도 확인이 필요하다."
+  "applicable_scale": "반복 횟수 × 매 단계 처리 비용이 시간 제약을 넘는지가 기준이다. 반복 횟수 자체가 N이 아니라 문제에 명시된 '턴 수'인 경우가 많으니 별도 확인이 필요하다.",
+  "distinguishing_from": [
+    { "ref": "simulation_grid", "signal": "상태 변화가 2차원 격자/보드 위에서 일어난다면 simulation_grid가 더 구체적인 접근이다." },
+    { "ref": "bruteforcing", "signal": "모든 경우의 수를 다 시도하는 것이 아니라 정해진 하나의 절차를 그대로 따라가는 것이라면 simulation_general이 맞다. 여러 선택지 중 답을 찾아야 한다면 bruteforcing을 고려해야 한다." }
+  ]
 }

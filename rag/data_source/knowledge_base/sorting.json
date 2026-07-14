@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "표준 정렬은 O(N log N)이라 N이 수백만이어도 대체로 안전하다. N²로 직접 정렬을 구현하면 N이 수천을 넘는 순간 위험하다."
+  "applicable_scale": "표준 정렬은 O(N log N)이라 N이 수백만이어도 대체로 안전하다. N²로 직접 정렬을 구현하면 N이 수천을 넘는 순간 위험하다.",
+  "distinguishing_from": [
+    { "ref": "greedy_sort_based", "signal": "정렬 후 순서대로 선택해나가는 절차까지 필요하다면 greedy_sort_based를 참고해야 한다. 정렬 자체가 목적이면 sorting으로 충분하다." },
+    { "ref": "priority_queue", "signal": "전체를 한 번만 정렬하는 것이 아니라 삽입/삭제가 반복되며 그때그때 최댓값/최솟값을 꺼내야 한다면 priority_queue가 필요하다." }
+  ],
+  "code_signals": {
+    "keywords": ["Arrays.sort(", "Collections.sort("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "medium",
+    "confidence_note": "정렬 호출 자체는 여러 카테고리(greedy_sort_based, array_sorted_pattern 등)에서 공통으로 등장해 단독으로는 구분력이 약하다."
+  }
 }

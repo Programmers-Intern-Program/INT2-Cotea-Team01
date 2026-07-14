@@ -16,5 +16,14 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "전처리 O(N), 질의당 O(1)이라 질의 횟수가 많을수록(수만 회 이상) 매번 순회하는 방식 대비 이점이 커진다."
+  "applicable_scale": "전처리 O(N), 질의당 O(1)이라 질의 횟수가 많을수록(수만 회 이상) 매번 순회하는 방식 대비 이점이 커진다.",
+  "distinguishing_from": [
+    { "ref": "sliding_window", "signal": "구간이 고정되어 있지 않고 조건에 따라 계속 움직여야(확장/축소) 한다면 sliding_window가 더 맞다. 임의의 고정된 구간 합을 반복 조회한다면 prefix_sum이 더 맞다." }
+  ],
+  "code_signals": {
+    "keywords": ["prefixSum", "prefix[i", "psum"],
+    "exclusion_keywords": [],
+    "keyword_confidence": "medium",
+    "confidence_note": "변수명 관례에 의존하므로 다른 이름을 쓰면 놓칠 수 있다."
+  }
 }

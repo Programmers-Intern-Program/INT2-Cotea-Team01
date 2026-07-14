@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "O(N²) 방식은 N이 수천 이하일 때 안전하고, N이 10만 이상이면 O(N log N) 최적화(이분 탐색 접목)가 필요하다."
+  "applicable_scale": "O(N²) 방식은 N이 수천 이하일 때 안전하고, N이 10만 이상이면 O(N log N) 최적화(이분 탐색 접목)가 필요하다.",
+  "distinguishing_from": [
+    { "ref": "dp_general", "signal": "부분수열(순서를 유지한 채 일부 제거) 구조가 아니라면 dp_general을 참고해야 한다." },
+    { "ref": "string_pattern_basic", "signal": "연속된 부분 '문자열'의 존재 여부/등장 횟수만 확인하면 된다면 string_pattern_basic이 더 단순하다. 순서만 유지하면 되는 비연속 부분수열 조건이라면 dp_subsequence가 필요하다." }
+  ]
 }

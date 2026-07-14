@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "정렬 비용 O(N log N)을 더해도 시간 제약 안에 들어오는 규모(N ≤ 100만 수준)에서 안전하다."
+  "applicable_scale": "정렬 비용 O(N log N)을 더해도 시간 제약 안에 들어오는 규모(N ≤ 100만 수준)에서 안전하다.",
+  "distinguishing_from": [
+    { "ref": "sorting", "signal": "정렬 자체가 목적이라면 sorting으로 충분하다. 정렬 후 순서대로 선택하는 절차까지 필요하다면 greedy_sort_based다." },
+    { "ref": "greedy_general", "signal": "정렬이 전제되지 않는 더 일반적인 그리디 선택이라면 greedy_general을 참고해야 한다." }
+  ],
+  "code_signals": {
+    "keywords": ["Arrays.sort(", "Collections.sort("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "low",
+    "confidence_note": "정렬 호출만으로는 sorting, array_sorted_pattern과 구분되지 않는다. 정렬 이후 순차 선택 로직이 함께 있는지 확인이 필요하다."
+  }
 }

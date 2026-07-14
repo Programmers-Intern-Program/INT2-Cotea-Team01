@@ -16,5 +16,19 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "O(V+E)이나, 재귀 깊이가 V에 비례할 수 있어 V가 수만 이상이면 재귀 대신 반복(명시적 스택) 구현을 고려해야 한다."
+  "applicable_scale": "O(V+E)이나, 재귀 깊이가 V에 비례할 수 있어 V가 수만 이상이면 재귀 대신 반복(명시적 스택) 구현을 고려해야 한다.",
+  "distinguishing_from": [
+    { "ref": "bfs", "signal": "'최소 몇 번/최단 거리'를 묻는 문제라면 dfs가 아니라 bfs다. dfs는 '모든 경우를 다 확인'하거나 '연결 여부만 확인'할 때 적합하다." },
+    { "ref": "backtracking", "signal": "탐색 도중 조건에 안 맞는 경로를 일찍 포기(가지치기)하고 선택을 되돌려야 한다면 backtracking을 참고해야 한다." }
+  ],
+  "often_combined_with": [
+    { "ref": "simulation_grid", "note": "격자에서 연결된 영역(flood fill)을 찾는 문제에 자주 결합된다." },
+    { "ref": "graph_connectivity", "note": "그래프의 연결 요소(그룹) 개수를 세는 구현 도구로 흔히 쓰인다." }
+  ],
+  "code_signals": {
+    "keywords": [],
+    "exclusion_keywords": ["Queue<", "Deque<", ".poll(", ".offer("],
+    "keyword_confidence": "low",
+    "confidence_note": "dfs 자체는 재귀 호출이 신호라 문자열 키워드로 강하게 잡기 어렵다. 다만 Queue/Deque 사용 흔적이 있으면 dfs가 아니라 bfs일 가능성이 높다는 제외 신호로는 쓸 수 있다."
+  }
 }

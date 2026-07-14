@@ -16,5 +16,17 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "단순 포함 검색은 문자열 길이 N, 패턴 길이 M일 때 O(N*M)이라 N, M이 각각 수천 이하일 때 안전하다. 그 이상이면 고급 문자열 알고리즘이 필요할 수 있다."
+  "applicable_scale": "단순 포함 검색은 문자열 길이 N, 패턴 길이 M일 때 O(N*M)이라 N, M이 각각 수천 이하일 때 안전하다. 그 이상이면 고급 문자열 알고리즘이 필요할 수 있다.",
+  "distinguishing_from": [
+    { "ref": "string_general", "signal": "패턴 검색이 아니라 문자열 자체를 분해/재조합/변형하는 것이 목적이라면 string_general을 참고해야 한다." }
+  ],
+  "often_combined_with": [
+    { "ref": "two_pointer", "note": "회문 판별 등 문자열 양 끝을 좁혀가며 비교하는 구현에 결합해서 쓰인다." }
+  ],
+  "code_signals": {
+    "keywords": [".contains(", ".indexOf("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "high",
+    "confidence_note": "내장 패턴 검색 메서드 호출은 명확한 신호다."
+  }
 }

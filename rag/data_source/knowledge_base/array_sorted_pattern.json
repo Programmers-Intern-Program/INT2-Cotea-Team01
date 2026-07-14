@@ -16,5 +16,16 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "정렬 비용(O(N log N))을 감당할 수 있는 규모(N ≤ 100만 수준)에서 유효하다. 정렬 후 처리가 O(N)이라면 전체적으로 안전하다."
+  "applicable_scale": "정렬 비용(O(N log N))을 감당할 수 있는 규모(N ≤ 100만 수준)에서 유효하다. 정렬 후 처리가 O(N)이라면 전체적으로 안전하다.",
+  "distinguishing_from": [
+    { "ref": "array_general", "signal": "정렬을 전제로 하지 않고 단순 순회/인덱스 접근만으로 충분하다면 array_general이 더 맞다." },
+    { "ref": "two_pointer", "signal": "정렬 후 양 끝에서 좁혀가며 탐색하는 구체적인 절차가 필요하면 two_pointer가 더 구체적인 접근이다." },
+    { "ref": "binary_search", "signal": "정렬된 배열에서 특정 조건을 만족하는 경계값 하나를 찾는 것이 목적이면 binary_search가 더 맞다." }
+  ],
+  "code_signals": {
+    "keywords": ["Arrays.sort(", "Collections.sort("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "medium",
+    "confidence_note": "정렬을 쓴다고 항상 이 카테고리인 것은 아니다 — sorting, greedy_sort_based의 전처리 단계로도 흔히 쓰인다."
+  }
 }

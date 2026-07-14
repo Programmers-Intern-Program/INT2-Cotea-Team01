@@ -16,5 +16,18 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "격자 크기 R×C와 반복 횟수의 곱이 기준이다. 격자가 크고(수백×수백) 반복도 많으면 O(R*C*턴수)가 위험할 수 있다."
+  "applicable_scale": "격자 크기 R×C와 반복 횟수의 곱이 기준이다. 격자가 크고(수백×수백) 반복도 많으면 O(R*C*턴수)가 위험할 수 있다.",
+  "distinguishing_from": [
+    { "ref": "simulation_general", "signal": "격자/보드 형태가 아니라 순서가 있는 절차 전반을 다룬다면 simulation_general이 더 맞다." }
+  ],
+  "often_combined_with": [
+    { "ref": "bfs", "note": "격자에서 확산/전파가 거리 순서대로 진행되는 문제(예: 최소 시간에 퍼지는 범위)는 격자 순회 규칙과 bfs가 함께 쓰인다." },
+    { "ref": "dfs", "note": "격자에서 연결된 영역의 크기/개수를 세는 문제(flood fill 등)는 격자 순회와 dfs(또는 bfs)가 함께 쓰인다." }
+  ],
+  "code_signals": {
+    "keywords": ["dx[", "dy[", "dx =", "dy ="],
+    "exclusion_keywords": [],
+    "keyword_confidence": "high",
+    "confidence_note": "방향 벡터 배열은 격자 이동 문제에서 매우 흔하게 쓰이는 관례적 패턴이다."
+  }
 }

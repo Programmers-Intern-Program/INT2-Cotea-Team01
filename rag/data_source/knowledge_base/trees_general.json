@@ -16,5 +16,9 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "트리 깊이가 N에 비례할 수 있는 경우(편향 트리) 재귀 깊이 문제를 별도로 고려해야 한다."
+  "applicable_scale": "트리 깊이가 N에 비례할 수 있는 경우(편향 트리) 재귀 깊이 문제를 별도로 고려해야 한다.",
+  "distinguishing_from": [
+    { "ref": "trees_bst", "signal": "왼쪽<오른쪽 정렬 성질이 문제에 전제되어 있다면 trees_bst가 더 구체적인 접근이다." },
+    { "ref": "graph_general", "signal": "사이클이 있을 수 있거나 부모-자식 관계가 명확하지 않은 일반 그래프라면 graph_general을 참고해야 한다." }
+  ]
 }

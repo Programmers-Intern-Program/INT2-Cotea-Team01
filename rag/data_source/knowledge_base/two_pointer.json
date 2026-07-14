@@ -16,5 +16,18 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "O(N)이라 N이 수백만이어도 안전하다. 정렬 전제가 있는 경우 정렬 비용 O(N log N)이 추가된다."
+  "applicable_scale": "O(N)이라 N이 수백만이어도 안전하다. 정렬 전제가 있는 경우 정렬 비용 O(N log N)이 추가된다.",
+  "distinguishing_from": [
+    { "ref": "sliding_window", "signal": "정렬을 전제로 두 값의 합/차 조건을 찾거나 두 배열을 비교하는 문제면 two_pointer다. '정렬 여부와 무관하게 연속된 부분 구간'을 찾는 문제라면 sliding_window가 더 맞다." },
+    { "ref": "binary_search", "signal": "쌍이 아니라 조건을 만족하는 값 하나(또는 경계)를 찾는 것이 목적이면 binary_search가 더 맞다." }
+  ],
+  "often_combined_with": [
+    { "ref": "string_pattern_basic", "note": "회문(palindrome) 판별처럼 문자열 양 끝을 좁혀가며 비교하는 문제에 결합해서 쓰인다." }
+  ],
+  "code_signals": {
+    "keywords": ["left", "right"],
+    "exclusion_keywords": [],
+    "keyword_confidence": "low",
+    "confidence_note": "sliding_window나 binary_search도 유사한 변수명을 쓰는 경우가 많아 이름만으로는 구분력이 약하다. binary_search와 달리 mid 변수가 없다는 점이 구분에 도움이 될 수 있다."
+  }
 }

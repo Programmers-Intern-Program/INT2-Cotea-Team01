@@ -16,5 +16,15 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "규모보다 자료구조 성질(LIFO)이 적합한지가 기준이다. push/pop이 각각 O(1)이라 대규모 N에서도 안전하다."
+  "applicable_scale": "규모보다 자료구조 성질(LIFO)이 적합한지가 기준이다. push/pop이 각각 O(1)이라 대규모 N에서도 안전하다.",
+  "distinguishing_from": [
+    { "ref": "queue_deque", "signal": "넣은 순서대로 꺼내야 한다면(FIFO) queue_deque가 맞다. 가장 최근 것부터 꺼내야 한다면(LIFO) stack이 맞다." },
+    { "ref": "backtracking", "signal": "명시적 스택 자료구조 사용이 아니라 재귀 호출 자체로 선택-되돌리기를 표현한다면 backtracking을 참고해야 한다." }
+  ],
+  "code_signals": {
+    "keywords": [".push(", ".pop("],
+    "exclusion_keywords": [],
+    "keyword_confidence": "medium",
+    "confidence_note": "push/pop은 Deque를 스택으로 쓸 때도 큐로 쓸 때도 등장할 수 있어 offer/poll 유무와 함께 봐야 한다."
+  }
 }

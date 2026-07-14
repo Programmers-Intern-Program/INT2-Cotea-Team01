@@ -16,5 +16,11 @@
     "type": "ai_generated",
     "note": "팀 검수 전 초안"
   },
-  "applicable_scale": "규모 자체보다 인덱스 접근/순회 방식이 기준이다. N이 10만 이하라면 대부분 단순 순회로 충분하다."
+  "applicable_scale": "규모 자체보다 인덱스 접근/순회 방식이 기준이다. N이 10만 이하라면 대부분 단순 순회로 충분하다.",
+  "distinguishing_from": [
+    { "ref": "array_sorted_pattern", "signal": "정렬되어 있거나 정렬을 전제로 하면 더 쉽게 풀리는 문제라면 array_sorted_pattern이 더 구체적인 접근이다." },
+    { "ref": "two_pointer", "signal": "정렬된 배열에서 두 값의 합/차 조건을 양 끝에서 좁혀가며 찾아야 한다면 two_pointer가 더 맞다." },
+    { "ref": "prefix_sum", "signal": "특정 구간의 합을 반복적으로 구해야 한다면 prefix_sum이 더 구체적인 접근이다." },
+    { "ref": "hash_set_general", "signal": "값의 존재 여부만 반복적으로 확인하면 된다면 hash_set_general이 더 맞다." }
+  ]
 }

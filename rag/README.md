@@ -8,20 +8,19 @@
 │   ├── knowledge_base/    # 30개 — 알고리즘 카테고리별 개념 문서
 │   └── common_pitfalls/   # 12개 — 카테고리 무관 자바 실수 패턴
 ├── build/                 # 생성된 결과물 (data_source로부터 재생성 가능, 직접 수정 금지)
-│   ├── knowledge_base_chunks.json
-│   ├── common_pitfalls_chunks.json
+│   ├── knowledge_base_docs.json    # 문서 30건 (청크 분할 없음)
 │   └── common_pitfalls_keywords.json
 ├── config/
 │   ├── field_level_mapping.json   # 필드(용도) -> 힌트 레벨 매핑 (레벨 체계 변경 시 여기만 수정)
 │   └── prompt-policy.json         # 공통 튜터 정책 (backend/resources/config 와 동기화)
 ├── scripts/
-│   ├── regenerate_chunks.py       # data_source -> build 변환
-│   ├── build_index.py             # build/*.json -> Chroma 벡터 DB 저장
-│   └── query_test.py              # RAG 검색 테스트
+│   └── regenerate_chunks.py       # data_source -> build 변환
 └── problems/ (gitignore)          # 문제별 메타데이터, 저작권 문제로 비공개 관리
 ```
 
 **data_source를 고쳤다면 반드시 `scripts/regenerate_chunks.py`를 다시 실행해서 `build/`를 갱신해야 합니다.**
+
+**2026-07-14 결정: 벡터DB(Chroma)는 쓰지 않습니다.** `knowledge_base`가 30개 문서·20개 카테고리로 규모가 작아 시맨틱 유사도 검색의 이득보다 임베딩 API·Chroma 운영 부담이 더 크다고 판단했습니다. 이전에 있던 `build_index.py`(Chroma 인덱싱), `query_test.py`(Chroma 검색 테스트), `common_pitfalls_chunks.json`(임베딩용 청크)는 전부 삭제했습니다. 대신 category(+subcategory) 정확 매칭 + 힌트 레벨 하드 필터 방식을 씁니다 (아래 "검색 로직 요약" 참고).
 
 ## `knowledge_base` 문서 스키마
 
@@ -36,7 +35,19 @@
     "java_specific_notes": "..."
   },
   "applicable_scale": "...", // 이 접근이 통하는/안 통하는 입력 규모 기준
-  "source": {...}
+  "source": {...},
+  "distinguishing_from": [   // 선택 — 혼동하기 쉬운 카테고리와의 구분 신호
+    { "ref": "다른 doc_id", "signal": "이 조건이면 그쪽이 아니라 이쪽이라는 판별 문장" }
+  ],
+  "code_signals": {          // 선택 — common_pitfalls와 동일한 구조, 사용자 코드 키워드 매칭용
+    "keywords": ["..."],
+    "exclusion_keywords": ["..."],
+    "keyword_confidence": "high | medium | low",
+    "confidence_note": "..."
+  },
+  "often_combined_with": [   // 선택 — 배타적 구분이 아니라 실제로 함께 쓰이는 카테고리
+    { "ref": "다른 doc_id", "note": "어떤 맥락에서 결합되는지" }
+  ]
 }
 ```
 
@@ -71,27 +82,18 @@ Claude 검증을 한 번 더 거치도록 유도합니다.
 다만 `recursion_termination`처럼 특정 항목만 예외적으로 다른 레벨에서도
 필요한 경우, 그 항목에만 `level_overrides`를 얹어서 전역 기본값을 덮어씁니다.
 
-## 청크(build 산출물) 관련 참고 — Chroma 저장 방식
+## build 산출물 관련 참고 — 태그 정확 매칭 방식
 
-Chroma 벡터 DB의 메타데이터는 배열 타입을 지원하지 않습니다. 그래서:
+`knowledge_base_docs.json`은 문서 하나 = 결과 하나로, 청크 분할이나 `[category/subcategory]` 접두어가 없습니다. 청크를 쪼개거나 접두어를 붙이던 이유(Chroma 메타데이터가 배열을 지원하지 않는 제약)가 벡터DB를 쓰지 않기로 하면서 사라졌기 때문입니다. `distinguishing_from`/`code_signals`/`often_combined_with` 같은 배열 필드도 원본 그대로 저장됩니다.
 
-- `applicable_scale`, `definition` 등은 각각 독립된 청크(`field`로 구분)로 쪼개서 저장합니다.
-- 청크 `content`에는 `[category/subcategory]` 또는 `[pitfall_id]` 접두어를 붙여서,
-  청크 하나만 단독으로 봐도 어떤 맥락인지 알 수 있게 합니다. (필드 단위로
-  쪼개져서 프롬프트에 단독으로 들어갈 때 상위 맥락을 잃는 문제를 방지하기 위함)
-- `level_overrides`가 있는 청크는 `override_lv2` / `override_lv3` / `override_lv4`
-  boolean 필드로 변환되어 저장됩니다 (배열을 직접 저장할 수 없어서). 이 boolean만
-  보면 파싱 없이 바로 쓸 수 있습니다 — 원본(`data_source`)의 `level_overrides`가
-  정식 규격이고, 청크의 boolean은 그 저장소 한계에 따른 변환일 뿐입니다.
+`common_pitfalls`의 `level_overrides`(배열)도 마찬가지로 원본 형태 그대로 다루는 쪽으로 갈 수 있지만, 현재 `common_pitfalls_keywords.json` 생성 로직 자체는 이번 결정과 무관하게 유지했습니다 (키워드 매칭은 원래부터 Chroma와 별개였습니다).
 
-## 검색 로직 요약 (`scripts/query_test.py`)
+## 검색 로직 요약
 
-1. **category 정확 매칭** (하드 필터): 문제의 `classification.primary[].tag`로 후보를 좁힙니다.
-2. **시맨틱 검색**: 남은 후보 중 질문과 임베딩 유사도로 순위를 매깁니다.
-3. **레벨 소프트 부스트**: 하드 필터가 아니라, 요청한 힌트 레벨과 관련된 필드의
-   청크에 distance 가산점을 주는 방식입니다. 레벨이 안 맞아도 후보에서 완전히
-   배제되지는 않습니다 (레벨 스코프를 하드 필터로 뒀을 때 진짜 정답 문서가
-   레벨 태그 때문에 통째로 걸러지는 문제가 실제로 발견되어 이렇게 바꿨습니다).
+1. **category(+subcategory) 정확 매칭** (하드 필터): 문제의 `classification.primary[].tag`로 `knowledge_base_docs.json`에서 문서를 조회합니다. 카테고리당 문서가 사실상 1:1이라, 태그가 정해지면 어떤 문서를 쓸지도 사실상 정해집니다.
+2. **힌트 레벨 하드 필터**: `config/field_level_mapping.json`의 매핑을 기준으로, 현재 힌트 레벨과 관련 없는 필드는 애초에 프롬프트에 포함하지 않습니다. 문제 메타데이터(A) 조회에 쓰는 `ProblemContextSelector`와 동일한 "정책 파일이 필드 노출을 정하고 코드는 조립만" 패턴입니다.
+
+시맨틱 유사도 랭킹 단계는 없습니다 — 벡터DB를 쓰지 않기로 하면서 "검색 랭킹"이라는 개념 자체가 없어졌습니다. 실제 조회 코드(`RagRetrievalService` 구현체)는 아직 작성 전입니다.
 
 ## `keywords`는 임베딩 검색과 다른 갈래입니다
 
