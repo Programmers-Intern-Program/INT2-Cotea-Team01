@@ -5,8 +5,13 @@ cotea:
   claude:
     api-key: sk-ant-api03-여기에_본인_키
     # model: claude-sonnet-4-6  # 선택
+  openai:
+    api-key: sk-여기에_OpenAI_키   # 선택. 없으면 off-topic은 Claude fallback
+    model: gpt-4o-mini
   problem-meta:
     directory: ../rag/problems
+  off-topic:
+    enabled: true
 
 # 선택: 로컬 MySQL 문제 메타데이터 사용
 # spring.datasource.url 이 있으면 DB를 먼저 조회하고, 실패 시 rag/problems JSON으로 fallback 합니다.
