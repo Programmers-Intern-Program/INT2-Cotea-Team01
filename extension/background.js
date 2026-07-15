@@ -248,7 +248,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({
             error: 'content.js와 통신할 수 없습니다. 프로그래머스 탭 새로고침 후 다시 시도해주세요.'
           });
-        } else if (response && response.code) {
+        } else if (response && typeof response.code === 'string') {
           console.log('[Cotea] 코드 수신 완료:', response.code.length, '자');
 
           const language = response.language || 'Unknown';

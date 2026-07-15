@@ -167,7 +167,7 @@ async function syncPageContext() {
     if (response && response.error) {
       return;
     }
-    if (response && response.code) {
+    if (response && typeof response.code === 'string') {
       state.latestCode = response.code;
     }
     if (response && response.problemId != null) {
