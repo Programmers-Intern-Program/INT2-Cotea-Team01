@@ -330,25 +330,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === 'GET_KAKAO_REDIRECT_URI') {
-    try {
-      sendResponse({ ok: true, redirectUri: getKakaoRedirectUri() });
-    } catch (error) {
-      sendResponse({ ok: false, error: error.message });
-    }
-    return false;
-  }
-
-  if (message.type === 'LAUNCH_KAKAO_AUTH') {
-    launchWebAuthFlow({
-      url: message.authorizeUrl,
-      interactive: true,
-    })
-      .then((redirectUrl) => sendResponse({ ok: true, redirectUrl }))
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-
   if (message.type === 'LOGOUT') {
     setLocalState({ authState: null })
       .then(() => sendResponse({ ok: true }))

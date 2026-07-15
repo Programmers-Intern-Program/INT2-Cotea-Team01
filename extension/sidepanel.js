@@ -209,89 +209,6 @@ function applyAuthState(authState) {
   state.kakaoNickname = user && user.nickname ? user.nickname : null;
 }
 
-function normalizeApiBaseUrl() {
-  return (state.apiConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
-}
-
-function randomState() {
-  const values = new Uint32Array(4);
-  crypto.getRandomValues(values);
-  return Array.from(values, (value) => value.toString(16)).join('');
-}
-
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    let detail = '';
-    try {
-      const errorBody = await response.json();
-      if (errorBody.message) {
-        detail = `: ${errorBody.message}`;
-      }
-    } catch (_error) {
-      // ignore parse errors
-    }
-    throw new Error(`로그인 API 요청 실패: ${response.status}${detail}`);
-  }
-  return response.json();
-}
-
-async function getKakaoRedirectUri() {
-  const response = await sendRuntimeMessage({ type: 'GET_KAKAO_REDIRECT_URI' });
-  if (!response || !response.ok || !response.redirectUri) {
-    throw new Error((response && response.error) || '카카오 리다이렉트 URI를 만들지 못했습니다.');
-  }
-  return response.redirectUri;
-}
-
-async function launchKakaoAuth(authorizeUrl) {
-  const response = await sendRuntimeMessage({ type: 'LAUNCH_KAKAO_AUTH', authorizeUrl });
-  if (!response || !response.ok || !response.redirectUrl) {
-    throw new Error((response && response.error) || '카카오 로그인 창을 열지 못했습니다.');
-  }
-  return response.redirectUrl;
-}
-
-async function loginWithKakaoApi() {
-  const baseUrl = normalizeApiBaseUrl();
-  const redirectUri = await getKakaoRedirectUri();
-  const stateToken = randomState();
-
-  const authorize = await fetchJson(
-    `${baseUrl}/api/auth/kakao/authorize-url?redirectUri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(stateToken)}`
-  );
-  const redirectUrl = await launchKakaoAuth(authorize.authorizeUrl);
-  const redirected = new URL(redirectUrl);
-
-  const error = redirected.searchParams.get('error');
-  if (error) {
-    throw new Error(`카카오 로그인이 취소되었거나 실패했습니다: ${error}`);
-  }
-  if (redirected.searchParams.get('state') !== stateToken) {
-    throw new Error('카카오 로그인 state 값이 일치하지 않습니다.');
-  }
-
-  const code = redirected.searchParams.get('code');
-  if (!code) {
-    throw new Error('카카오 인가 코드를 받지 못했습니다.');
-  }
-
-  const auth = await fetchJson(`${baseUrl}/api/auth/kakao`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, redirectUri }),
-  });
-  const authState = {
-    accessToken: auth.accessToken,
-    tokenType: auth.tokenType || 'Bearer',
-    expiresIn: auth.expiresIn,
-    expiresAt: Date.now() + Number(auth.expiresIn || 0) * 1000,
-    user: auth.user || null,
-  };
-  await chrome.storage.local.set({ authState });
-  return authState;
-}
-
 function buildAvatarMarkup(glow, variant = 'chat') {
   return `
     <div class="cotea-avatar-shell cotea-avatar-shell--${variant} ${glow ? 'glow' : ''}">
@@ -886,8 +803,11 @@ async function handleKakaoLogin() {
   renderShell();
 
   try {
-    const authState = await loginWithKakaoApi();
-    applyAuthState(authState);
+    const response = await sendRuntimeMessage({ type: 'LOGIN_KAKAO' });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || '카카오 로그인에 실패했습니다.');
+    }
+    applyAuthState(response.authState);
     state.loginPending = false;
     state.loginSuccess = true;
     state.loginNotice = `${state.kakaoNickname || '카카오 사용자'}님 환영합니다!`;
@@ -911,7 +831,12 @@ async function handleLogout() {
   try {
     await sendRuntimeMessage({ type: 'LOGOUT' });
   } catch (_error) {
-    // 로컬 상태는 아래에서 정리
+    // LOGOUT 메시지 전송이 실패해도 로컬 storage는 반드시 정리한다
+  }
+  try {
+    await chrome.storage.local.set({ authState: null });
+  } catch (_error) {
+    // ignore
   }
   applyAuthState(null);
   state.showLogin = false;
