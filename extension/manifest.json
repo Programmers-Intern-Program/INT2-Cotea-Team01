@@ -8,10 +8,12 @@
     "48": "icon.png",
     "128": "icon.png"
   },
-  "permissions": ["storage", "sidePanel", "tabs"],
+  "permissions": ["storage", "sidePanel", "tabs", "identity"],
   "host_permissions": [
     "https://school.programmers.co.kr/*",
-    "http://localhost/*"
+    "http://localhost/*",
+    "https://kauth.kakao.com/*",
+    "https://kapi.kakao.com/*"
   ],
   "background": {
     "service_worker": "background.js"

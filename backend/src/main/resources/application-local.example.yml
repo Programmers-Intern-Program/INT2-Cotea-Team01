@@ -12,6 +12,13 @@ cotea:
     directory: ../rag/problems
   off-topic:
     enabled: true
+  kakao:
+    client-id: 여기에_카카오_REST_API_KEY
+    # client-secret: 여기에_카카오_CLIENT_SECRET # 카카오 앱에서 사용 설정한 경우만
+    redirect-uri: http://localhost:8080/api/auth/kakao/callback
+  jwt:
+    secret: 개발용_긴_랜덤_문자열
+    access-token-ttl-seconds: 604800
 
 # 선택: 로컬 MySQL 문제 메타데이터 사용
 # spring.datasource.url 이 있으면 DB를 먼저 조회하고, 실패 시 rag/problems JSON으로 fallback 합니다.

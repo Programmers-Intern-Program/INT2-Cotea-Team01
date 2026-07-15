@@ -7,6 +7,7 @@ const DEFAULT_API_CONFIG = {
 
 const DEFAULT_PROBLEM_ID = 1829;
 const HINT_API_TIMEOUT_MS = 20000;
+const AUTH_API_TIMEOUT_MS = 15000;
 
 function getLocalState(defaults) {
   return new Promise((resolve, reject) => {
@@ -59,6 +60,122 @@ function buildMockAnswer(questionText, code) {
   };
 }
 
+function randomState() {
+  const values = new Uint32Array(4);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => value.toString(16)).join('');
+}
+
+function withTimeout(ms) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  return { controller, timeoutId };
+}
+
+function normalizeApiBaseUrl(apiConfig) {
+  const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
+  return (mergedConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+}
+
+async function fetchJson(url, options = {}, timeoutMs = AUTH_API_TIMEOUT_MS) {
+  const { controller, timeoutId } = withTimeout(timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('로그인 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const errorBody = await response.json();
+      if (errorBody.message) {
+        detail = `: ${errorBody.message}`;
+      }
+    } catch (_error) {
+      // ignore parse errors
+    }
+    throw new Error(`로그인 API 요청 실패: ${response.status}${detail}`);
+  }
+
+  return response.json();
+}
+
+function launchWebAuthFlow(details) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow(details, (redirectUrl) => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+      if (!redirectUrl) {
+        reject(new Error('카카오 로그인 리다이렉트 URL을 받지 못했습니다.'));
+        return;
+      }
+      resolve(redirectUrl);
+    });
+  });
+}
+
+function getKakaoRedirectUri() {
+  return chrome.identity.getRedirectURL('kakao');
+}
+
+async function requestKakaoLogin() {
+  const { apiConfig } = await getLocalState({ apiConfig: DEFAULT_API_CONFIG });
+  const baseUrl = normalizeApiBaseUrl(apiConfig);
+  const redirectUri = getKakaoRedirectUri();
+  const state = randomState();
+
+  const authorize = await fetchJson(
+    `${baseUrl}/api/auth/kakao/authorize-url?redirectUri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
+  );
+  const redirectUrl = await launchWebAuthFlow({
+    url: authorize.authorizeUrl,
+    interactive: true,
+  });
+
+  const redirected = new URL(redirectUrl);
+  const error = redirected.searchParams.get('error');
+  if (error) {
+    throw new Error(`카카오 로그인이 취소되었거나 실패했습니다: ${error}`);
+  }
+  const returnedState = redirected.searchParams.get('state');
+  if (returnedState !== state) {
+    throw new Error('카카오 로그인 state 값이 일치하지 않습니다.');
+  }
+  const code = redirected.searchParams.get('code');
+  if (!code) {
+    throw new Error('카카오 인가 코드를 받지 못했습니다.');
+  }
+
+  const auth = await fetchJson(`${baseUrl}/api/auth/kakao`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirectUri }),
+  });
+  const expiresAt = Date.now() + Number(auth.expiresIn || 0) * 1000;
+  const authState = {
+    accessToken: auth.accessToken,
+    tokenType: auth.tokenType || 'Bearer',
+    expiresIn: auth.expiresIn,
+    expiresAt,
+    user: auth.user || null,
+  };
+  await setLocalState({ authState });
+  return authState;
+}
+
 function buildHintRequestBody(message) {
   const hintRequest = message.hintRequest || {};
   const body = {
@@ -88,7 +205,10 @@ function buildHintRequestBody(message) {
 }
 
 async function requestHintFromApi(message) {
-  const { apiConfig } = await getLocalState({ apiConfig: DEFAULT_API_CONFIG });
+  const { apiConfig, authState } = await getLocalState({
+    apiConfig: DEFAULT_API_CONFIG,
+    authState: null,
+  });
   const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
   if (!mergedConfig.endpoint) {
     mergedConfig.endpoint = DEFAULT_API_CONFIG.endpoint;
@@ -110,9 +230,14 @@ async function requestHintFromApi(message) {
 
   let response;
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authState && authState.accessToken) {
+      headers.Authorization = `${authState.tokenType || 'Bearer'} ${authState.accessToken}`;
+    }
+
     response = await fetch(`${normalizedBaseUrl}${normalizedEndpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(buildHintRequestBody(message)),
       signal: controller.signal,
     });
@@ -184,6 +309,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       problemId: null,
       problemTitle: null,
       apiConfig: DEFAULT_API_CONFIG,
+      authState: null,
       codeDirty: false,
     })
       .then((state) => sendResponse(state))
@@ -191,6 +317,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.error('[Cotea] GET_PANEL_STATE 조회 실패:', error.message);
         sendResponse({ error: error.message });
       });
+    return true;
+  }
+
+  if (message.type === 'LOGIN_KAKAO') {
+    requestKakaoLogin()
+      .then((authState) => sendResponse({ ok: true, authState }))
+      .catch((error) => {
+        console.error('[Cotea] 카카오 로그인 실패:', error.message);
+        sendResponse({ ok: false, error: error.message });
+      });
+    return true;
+  }
+
+  if (message.type === 'GET_KAKAO_REDIRECT_URI') {
+    try {
+      sendResponse({ ok: true, redirectUri: getKakaoRedirectUri() });
+    } catch (error) {
+      sendResponse({ ok: false, error: error.message });
+    }
+    return false;
+  }
+
+  if (message.type === 'LAUNCH_KAKAO_AUTH') {
+    launchWebAuthFlow({
+      url: message.authorizeUrl,
+      interactive: true,
+    })
+      .then((redirectUrl) => sendResponse({ ok: true, redirectUrl }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'LOGOUT') {
+    setLocalState({ authState: null })
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
@@ -248,7 +410,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({
             error: 'content.js와 통신할 수 없습니다. 프로그래머스 탭 새로고침 후 다시 시도해주세요.'
           });
-        } else if (response && response.code) {
+        } else if (response && typeof response.code === 'string') {
           console.log('[Cotea] 코드 수신 완료:', response.code.length, '자');
 
           const language = response.language || 'Unknown';

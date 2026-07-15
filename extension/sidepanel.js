@@ -56,6 +56,14 @@ const state = {
   onProgrammers: true,
   languageNotSupported: false,
   currentLanguage: 'Java',
+  showLogin: false,
+  loggedIn: false,
+  kakaoNickname: null,
+  authState: null,
+  loginPending: false,
+  loginSuccess: false,
+  loginNotice: '',
+  reportNotice: '',
 };
 
 const PROGRAMMERS_HOST = 'school.programmers.co.kr';
@@ -167,7 +175,7 @@ async function syncPageContext() {
     if (response && response.error) {
       return;
     }
-    if (response && response.code) {
+    if (response && typeof response.code === 'string') {
       state.latestCode = response.code;
     }
     if (response && response.problemId != null) {
@@ -192,6 +200,96 @@ function sendRuntimeMessage(payload) {
       resolve(response);
     });
   });
+}
+
+function applyAuthState(authState) {
+  state.authState = authState || null;
+  state.loggedIn = Boolean(authState && authState.accessToken);
+  const user = authState && authState.user ? authState.user : null;
+  state.kakaoNickname = user && user.nickname ? user.nickname : null;
+}
+
+function normalizeApiBaseUrl() {
+  return (state.apiConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+}
+
+function randomState() {
+  const values = new Uint32Array(4);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => value.toString(16)).join('');
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const errorBody = await response.json();
+      if (errorBody.message) {
+        detail = `: ${errorBody.message}`;
+      }
+    } catch (_error) {
+      // ignore parse errors
+    }
+    throw new Error(`로그인 API 요청 실패: ${response.status}${detail}`);
+  }
+  return response.json();
+}
+
+async function getKakaoRedirectUri() {
+  const response = await sendRuntimeMessage({ type: 'GET_KAKAO_REDIRECT_URI' });
+  if (!response || !response.ok || !response.redirectUri) {
+    throw new Error((response && response.error) || '카카오 리다이렉트 URI를 만들지 못했습니다.');
+  }
+  return response.redirectUri;
+}
+
+async function launchKakaoAuth(authorizeUrl) {
+  const response = await sendRuntimeMessage({ type: 'LAUNCH_KAKAO_AUTH', authorizeUrl });
+  if (!response || !response.ok || !response.redirectUrl) {
+    throw new Error((response && response.error) || '카카오 로그인 창을 열지 못했습니다.');
+  }
+  return response.redirectUrl;
+}
+
+async function loginWithKakaoApi() {
+  const baseUrl = normalizeApiBaseUrl();
+  const redirectUri = await getKakaoRedirectUri();
+  const stateToken = randomState();
+
+  const authorize = await fetchJson(
+    `${baseUrl}/api/auth/kakao/authorize-url?redirectUri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(stateToken)}`
+  );
+  const redirectUrl = await launchKakaoAuth(authorize.authorizeUrl);
+  const redirected = new URL(redirectUrl);
+
+  const error = redirected.searchParams.get('error');
+  if (error) {
+    throw new Error(`카카오 로그인이 취소되었거나 실패했습니다: ${error}`);
+  }
+  if (redirected.searchParams.get('state') !== stateToken) {
+    throw new Error('카카오 로그인 state 값이 일치하지 않습니다.');
+  }
+
+  const code = redirected.searchParams.get('code');
+  if (!code) {
+    throw new Error('카카오 인가 코드를 받지 못했습니다.');
+  }
+
+  const auth = await fetchJson(`${baseUrl}/api/auth/kakao`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirectUri }),
+  });
+  const authState = {
+    accessToken: auth.accessToken,
+    tokenType: auth.tokenType || 'Bearer',
+    expiresIn: auth.expiresIn,
+    expiresAt: Date.now() + Number(auth.expiresIn || 0) * 1000,
+    user: auth.user || null,
+  };
+  await chrome.storage.local.set({ authState });
+  return authState;
 }
 
 function buildAvatarMarkup(glow, variant = 'chat') {
@@ -445,6 +543,73 @@ function renderSubmissionResultSelector() {
   `;
 }
 
+function avatarInitial() {
+  return (state.kakaoNickname || '').trim().charAt(0) || '나';
+}
+
+function renderAccountButtonInner() {
+  if (state.loggedIn) {
+    return `<span class="account-avatar">${escapeHtml(avatarInitial())}</span>`;
+  }
+  return `
+    <svg class="account-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+      <circle cx="12" cy="7" r="4"></circle>
+    </svg>
+  `;
+}
+
+function renderProfileView() {
+  return `
+    <section class="login-view">
+      <div class="login-card">
+        <div class="login-card-head">
+          <p class="login-title">내 계정</p>
+          <button type="button" id="login-close" class="login-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="profile-row">
+          <span class="account-avatar account-avatar--lg">${escapeHtml(avatarInitial())}</span>
+          <div class="profile-info">
+            <p class="profile-name">${escapeHtml(state.kakaoNickname || '')}</p>
+            <p class="profile-sub">카카오 계정으로 로그인됨</p>
+          </div>
+        </div>
+        <button type="button" id="report-button" class="report-button">리포트 보기</button>
+        ${state.reportNotice ? `<p class="login-notice">${escapeHtml(state.reportNotice)}</p>` : ''}
+        <button type="button" id="logout-button" class="logout-button">로그아웃</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderLoginFormView() {
+  return `
+    <section class="login-view">
+      <div class="login-card">
+        <div class="login-card-head">
+          <p class="login-title">로그인</p>
+          <button type="button" id="login-close" class="login-close" aria-label="닫기">✕</button>
+        </div>
+        <p class="login-desc">로그인하면 학습 리포트 등 추가 기능을 이용할 수 있어요. 로그인하지 않아도 힌트 요청은 그대로 사용할 수 있습니다.</p>
+        ${state.loginNotice ? `<p class="login-notice ${state.loginSuccess ? 'success' : ''}">${escapeHtml(state.loginNotice)}</p>` : ''}
+        <button type="button" id="kakao-login-button" class="kakao-login-button" ${state.loginPending || state.loginSuccess ? 'disabled' : ''}>
+          <span class="kakao-bubble-icon" aria-hidden="true"></span>
+          ${state.loginPending ? '확인 중...' : '카카오로 시작하기'}
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderLoginView() {
+  // loginSuccess는 "방금 로그인 성공" 전환 구간 — 이 동안은 로그인됐어도 웰컴 문구가 있는
+  // 로그인 카드를 유지하고, 구간이 끝나면(auto-close) 다음에 열 때부터 프로필 카드로 전환된다.
+  if (state.loggedIn && !state.loginSuccess) {
+    return renderProfileView();
+  }
+  return renderLoginFormView();
+}
+
 const COMPOSER_MAX_HEIGHT = 120;
 
 function autoResizeComposerInput() {
@@ -458,9 +623,11 @@ function autoResizeComposerInput() {
   textarea.style.overflowY = textarea.scrollHeight > COMPOSER_MAX_HEIGHT ? 'auto' : 'hidden';
 }
 
+const FOCUS_TRACKED_INPUT_IDS = ['question-input'];
+
 function renderShell() {
   const focusedId = document.activeElement && document.activeElement.id;
-  const focusedSelection = focusedId === 'question-input'
+  const focusedSelection = FOCUS_TRACKED_INPUT_IDS.includes(focusedId)
     ? [document.activeElement.selectionStart, document.activeElement.selectionEnd]
     : null;
 
@@ -474,6 +641,9 @@ function renderShell() {
               <p class="cotea-kicker">Cotea AI Tutor</p>
               <p class="cotea-title">${escapeHtml(renderHeaderTitle())}</p>
             </div>
+            <button type="button" id="account-button" class="header-action account-button ${state.showLogin ? 'active' : ''}" aria-label="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}" data-tooltip="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}">
+              ${renderAccountButtonInner()}
+            </button>
             <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers ? 'disabled' : ''}>
               <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 4 23 10 17 10"></polyline>
@@ -484,6 +654,7 @@ function renderShell() {
           </div>
         </header>
 
+        ${state.showLogin ? renderLoginView() : `
         <section class="cotea-chat-scroll" id="chat-scroll">
           ${state.messages.map(renderMessage).join('')}
           ${renderBusyIndicator()}
@@ -514,6 +685,7 @@ function renderShell() {
             <p>Enter로 전송 · Cotea는 실수할 수 있어요</p>
           </div>
         </div>
+        `}
       </div>
     </div>
   `;
@@ -538,6 +710,46 @@ function renderShell() {
 }
 
 function bindEvents() {
+  const accountButton = document.getElementById('account-button');
+  if (accountButton) {
+    accountButton.addEventListener('click', () => {
+      state.showLogin = !state.showLogin;
+      if (!state.showLogin) {
+        state.loginNotice = '';
+        state.reportNotice = '';
+      }
+      renderShell();
+    });
+  }
+
+  const loginClose = document.getElementById('login-close');
+  if (loginClose) {
+    loginClose.addEventListener('click', () => {
+      state.showLogin = false;
+      state.loginNotice = '';
+      state.reportNotice = '';
+      renderShell();
+    });
+  }
+
+  const kakaoLoginButton = document.getElementById('kakao-login-button');
+  if (kakaoLoginButton) {
+    kakaoLoginButton.addEventListener('click', handleKakaoLogin);
+  }
+
+  const reportButton = document.getElementById('report-button');
+  if (reportButton) {
+    reportButton.addEventListener('click', () => {
+      state.reportNotice = '아직 준비중입니다';
+      renderShell();
+    });
+  }
+
+  const logoutButton = document.getElementById('logout-button');
+  if (logoutButton) {
+    logoutButton.addEventListener('click', handleLogout);
+  }
+
   const syncButton = document.getElementById('sync-button');
   if (syncButton) {
     syncButton.addEventListener('click', handleSync);
@@ -664,6 +876,49 @@ function handleSubmissionResultSelect(value) {
   }
 }
 
+async function handleKakaoLogin() {
+  if (state.loginPending) {
+    return;
+  }
+  state.loginPending = true;
+  state.loginSuccess = false;
+  state.loginNotice = '';
+  renderShell();
+
+  try {
+    const authState = await loginWithKakaoApi();
+    applyAuthState(authState);
+    state.loginPending = false;
+    state.loginSuccess = true;
+    state.loginNotice = `${state.kakaoNickname || '카카오 사용자'}님 환영합니다!`;
+    renderShell();
+
+    setTimeout(() => {
+      state.showLogin = false;
+      state.loginNotice = '';
+      state.loginSuccess = false;
+      renderShell();
+    }, 900);
+  } catch (error) {
+    state.loginPending = false;
+    state.loginSuccess = false;
+    state.loginNotice = error.message;
+    renderShell();
+  }
+}
+
+async function handleLogout() {
+  try {
+    await sendRuntimeMessage({ type: 'LOGOUT' });
+  } catch (_error) {
+    // 로컬 상태는 아래에서 정리
+  }
+  applyAuthState(null);
+  state.showLogin = false;
+  state.reportNotice = '';
+  renderShell();
+}
+
 async function handleSync() {
   if (state.syncing || !state.onProgrammers) {
     return;
@@ -788,6 +1043,7 @@ async function initialize() {
     state.problemId = response && response.problemId != null ? response.problemId : null;
     state.problemTitle = response && response.problemTitle ? response.problemTitle : null;
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
+    applyAuthState(response && response.authState ? response.authState : null);
     state.codeDirty = Boolean(response && response.codeDirty);
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
@@ -836,6 +1092,10 @@ async function initialize() {
 
     if (changes.apiConfig) {
       state.apiConfig = { ...DEFAULT_API_CONFIG, ...(changes.apiConfig.newValue || {}) };
+    }
+
+    if (changes.authState) {
+      applyAuthState(changes.authState.newValue || null);
     }
 
     if (changes.codeDirty) {

@@ -477,14 +477,17 @@ button {
 }
 
 .sync-button::after,
-.sync-button::before {
+.sync-button::before,
+.account-button::after,
+.account-button::before {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
   z-index: 5;
 }
 
-.sync-button::after {
+.sync-button::after,
+.account-button::after {
   content: attr(data-tooltip);
   position: absolute;
   top: calc(100% + 9px);
@@ -500,7 +503,8 @@ button {
   box-shadow: 0 8px 20px rgba(27, 42, 74, 0.28), 0 0 0 1px rgba(27, 42, 74, 0.08);
 }
 
-.sync-button::before {
+.sync-button::before,
+.account-button::before {
   content: '';
   position: absolute;
   top: 100%;
@@ -514,7 +518,11 @@ button {
 .sync-button:hover::after,
 .sync-button:hover::before,
 .sync-button:focus-visible::after,
-.sync-button:focus-visible::before {
+.sync-button:focus-visible::before,
+.account-button:hover::after,
+.account-button:hover::before,
+.account-button:focus-visible::after,
+.account-button:focus-visible::before {
   opacity: 1;
   transform: translateY(0);
 }
@@ -524,13 +532,37 @@ button {
   opacity: 0 !important;
 }
 
-.sync-icon {
+.sync-icon,
+.account-icon {
   display: block;
   color: #eef2ff;
 }
 
 .sync-button.syncing .sync-icon {
   animation: spin 0.8s linear infinite;
+}
+
+.account-button {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 8px rgba(8, 15, 30, 0.2);
+}
+
+.account-button:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.account-button.active {
+  background: rgba(255, 255, 255, 0.32);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .sync-button:disabled {
@@ -818,3 +850,177 @@ button {
     padding: 7px 9px;
   }
 }
+
+.login-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: #f1f4f9;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 280px;
+  padding: 18px 16px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 2px 12px rgba(27, 42, 74, 0.07), 0 1px 3px rgba(27, 42, 74, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1b2a4a;
+}
+
+.login-close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(27, 42, 74, 0.06);
+  color: #1b2a4a;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-desc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(27, 42, 74, 0.55);
+}
+
+.kakao-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px;
+  border: 0;
+  border-radius: 10px;
+  background: #fee500;
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.kakao-login-button:hover {
+  background: #fada0a;
+}
+
+.kakao-login-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.kakao-bubble-icon {
+  width: 15px;
+  height: 13px;
+  border-radius: 7px 7px 7px 2px;
+  background: rgba(0, 0, 0, 0.85);
+  flex-shrink: 0;
+}
+
+.login-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.login-notice.success {
+  background: rgba(5, 150, 105, 0.1);
+  color: #047857;
+}
+
+.account-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fee500;
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.account-avatar--lg {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-info {
+  min-width: 0;
+}
+
+.profile-name {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1b2a4a;
+}
+
+.profile-sub {
+  margin: 0;
+  font-size: 10.5px;
+  color: rgba(27, 42, 74, 0.5);
+}
+
+.report-button {
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #1b2a4a;
+  color: #eef2ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.report-button:hover {
+  background: #24345c;
+}
+
+.logout-button {
+  padding: 10px;
+  border: 1.5px solid rgba(27, 42, 74, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1b2a4a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.logout-button:hover {
+  background: rgba(27, 42, 74, 0.04);
+}
+
