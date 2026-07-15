@@ -25,6 +25,7 @@ public class ProblemMetaMapper {
         source.put("title", record.getTitle());
         source.put("level", record.getLevel());
         source.put("url", record.getUrl());
+        source.put("language", "java");
 
         ObjectNode classification = problem.putObject("classification");
         classification.put("difficultyReason", record.getDifficultyReason());
@@ -75,8 +76,9 @@ public class ProblemMetaMapper {
         wrongAnswerDiagnosis.set("commonMistakes", commonMistakes);
         wrongAnswerDiagnosis.set("fatalApproachSignals", toStringArray(record.getFatalApproachSignals(), item -> item.getSignalText()));
 
+        problem.set("edgeCases", toStringArray(record.getEdgeCases(), item -> item.getCaseText()));
+
         ObjectNode afterSolve = problem.putObject("afterSolve");
-        afterSolve.set("edgeCases", toStringArray(record.getEdgeCases(), item -> item.getCaseText()));
         afterSolve.set("evaluationCriteria", toStringArray(record.getEvaluationCriteria(), item -> item.getCriteriaText()));
         afterSolve.set("optimizationHints", toStringArray(record.getOptimizationHints(), item -> item.getHintText()));
         afterSolve.set("similarProblems", toStringArray(record.getSimilarProblems(), item -> item.getProblemName()));
