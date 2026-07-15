@@ -14,6 +14,8 @@ public class CoteaProperties {
     private final ProblemMeta problemMeta = new ProblemMeta();
     private final Rag rag = new Rag();
     private final OffTopic offTopic = new OffTopic();
+    private final Kakao kakao = new Kakao();
+    private final Jwt jwt = new Jwt();
 
     @Getter
     @Setter
@@ -51,5 +53,23 @@ public class CoteaProperties {
     public static class OffTopic {
         /** FREE_TEXT 질문을 저렴한 OpenAI(실패 시 Claude)로 돌릴지 */
         private boolean enabled = true;
+    }
+
+    @Getter
+    @Setter
+    public static class Kakao {
+        private String clientId;
+        private String clientSecret;
+        private String redirectUri;
+        private String authBaseUrl = "https://kauth.kakao.com";
+        private String apiBaseUrl = "https://kapi.kakao.com";
+    }
+
+    @Getter
+    @Setter
+    public static class Jwt {
+        private String secret;
+        private long accessTokenTtlSeconds = 60 * 60 * 24 * 7;
+        private String issuer = "cotea";
     }
 }

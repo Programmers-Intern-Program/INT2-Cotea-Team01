@@ -22,4 +22,18 @@ public class AppConfig {
                 .baseUrl(properties.getOpenAi().getBaseUrl())
                 .build();
     }
+
+    @Bean
+    WebClient kakaoAuthWebClient(CoteaProperties properties) {
+        return WebClient.builder()
+                .baseUrl(properties.getKakao().getAuthBaseUrl())
+                .build();
+    }
+
+    @Bean
+    WebClient kakaoApiWebClient(CoteaProperties properties) {
+        return WebClient.builder()
+                .baseUrl(properties.getKakao().getApiBaseUrl())
+                .build();
+    }
 }
