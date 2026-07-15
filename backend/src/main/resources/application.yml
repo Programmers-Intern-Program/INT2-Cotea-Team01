@@ -20,7 +20,9 @@ cotea:
     # 로컬: ../rag/problems/{problemId}.json
     directory: ${COTEA_PROBLEM_META_DIR:../rag/problems}
   rag:
-    enabled: false
+    enabled: true
+    # 로컬: ../rag (하위의 build/knowledge_base_docs.json, config/field_level_mapping.json을 읽음)
+    directory: ${COTEA_RAG_DIR:../rag}
   off-topic:
     enabled: true
   kakao:
@@ -33,3 +35,7 @@ cotea:
     secret: ${COTEA_JWT_SECRET:}
     access-token-ttl-seconds: ${COTEA_JWT_ACCESS_TOKEN_TTL_SECONDS:604800}
     issuer: cotea
+    
+logging:
+  file:
+    name: logs/cotea.log

@@ -45,6 +45,7 @@ public class CoteaProperties {
     @Setter
     public static class Rag {
         private boolean enabled;
+        private String directory = "../rag";
     }
 
     @Getter
