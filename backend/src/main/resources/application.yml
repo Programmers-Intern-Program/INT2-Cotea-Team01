@@ -23,3 +23,13 @@ cotea:
     enabled: false
   off-topic:
     enabled: true
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:}
+    auth-base-url: https://kauth.kakao.com
+    api-base-url: https://kapi.kakao.com
+  jwt:
+    secret: ${COTEA_JWT_SECRET:}
+    access-token-ttl-seconds: ${COTEA_JWT_ACCESS_TOKEN_TTL_SECONDS:604800}
+    issuer: cotea
