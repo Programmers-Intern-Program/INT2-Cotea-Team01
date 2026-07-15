@@ -116,6 +116,15 @@ function getVisibleEditorText() {
     return null;
   }
 
+  // CodeMirror는 뷰포트에 보이는 줄만 DOM에 렌더링(가상 스크롤)하므로,
+  // 렌더링된 줄 수가 전체 줄 수보다 적으면(스크롤로 일부 줄이 안 그려진 상태)
+  // 이 값은 잘린 코드다 — null을 반환해 getBestAvailableCode가 항상 전체
+  // 문서를 반환하는 CodeMirror API(getValue)로 폴백하게 한다.
+  const editorInstance = getCodeMirrorInstance();
+  if (editorInstance && editorInstance.lineCount() !== lines.length) {
+    return null;
+  }
+
   return Array.from(lines)
     .map((line) => line.textContent.replace(/​/g, ''))
     .join('\n');
