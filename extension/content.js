@@ -104,8 +104,9 @@ function getCurrentLanguage() {
 }
 
 function getVisibleEditorText() {
-  // CodeMirror JS API/hidden textarea가 실시간으로 안 따라오는 경우가 있어
-  // 화면에 실제로 그려진 코드 줄 DOM을 직접 읽는다 (타이핑 즉시 갱신됨)
+  // CodeMirror 인스턴스를 못 찾았을 때만 쓰는 최후의 수단.
+  // CodeMirror는 뷰포트에 보이는 줄만 DOM에 렌더링(가상 스크롤)하므로
+  // 이 값은 스크롤 상태에 따라 전체 문서가 아닐 수 있다.
   const editorEl = document.querySelector('.CodeMirror');
   if (!editorEl) {
     return null;
@@ -122,15 +123,19 @@ function getVisibleEditorText() {
 }
 
 function getBestAvailableCode() {
-  // 우선순위: 화면에 렌더링된 실제 텍스트(가장 실시간) > CodeMirror API > 굳은 hidden textarea
-  const visibleText = getVisibleEditorText();
-  if (visibleText !== null) {
-    return visibleText;
-  }
-
+  // CodeMirror 인스턴스가 있으면 항상 getValue()를 최우선으로 쓴다.
+  // getValue()는 뷰(스크롤/가상 렌더링)와 무관하게 내부 문서 모델을 그대로
+  // 반환하므로 항상 정확한 전체 코드다. 화면 DOM을 직접 읽는 방식은
+  // 스크롤 중 일부 줄만 그려진 상태를 잡아버릴 수 있어 인스턴스를 찾지
+  // 못한 예외 상황에서만 폴백으로 사용한다.
   const editorInstance = getCodeMirrorInstance();
   if (editorInstance) {
     return editorInstance.getValue();
+  }
+
+  const visibleText = getVisibleEditorText();
+  if (visibleText !== null) {
+    return visibleText;
   }
 
   return getFallbackCode();
