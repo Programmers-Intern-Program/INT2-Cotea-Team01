@@ -328,9 +328,12 @@ function renderMessage(message) {
   }
 
   const isAi = message.role === 'ai';
+  const recommendationCards = Array.isArray(message.recommendations) && message.recommendations.length > 0
+    ? renderRecommendationCards(message.recommendations)
+    : '';
   const bubbleBody = message.glow
     ? '<div class="typing-row"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">분석 중이에요...</span></div>'
-    : `${renderRichText(message.text)}${message.code ? renderCodeBlock(message.code.src, message.code.hl) : ''}`;
+    : `${renderRichText(message.text)}${message.code ? renderCodeBlock(message.code.src, message.code.hl) : ''}${recommendationCards}`;
 
   return `
     <div class="message-row ${isAi ? 'ai' : 'user'}">
@@ -344,8 +347,29 @@ function renderMessage(message) {
             ${message.trailChips.map((label) => `<button type="button" class="trail-chip" data-trail-chip="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join('')}
           </div>
         ` : ''}
+        ${message.suggestConceptDrill && !message.glow ? `
+          <div class="trail-chip-row">
+            <button type="button" class="trail-chip concept-drill-chip" data-recommend-trigger>관련 유형 문제 추천</button>
+          </div>
+        ` : ''}
         ${message.timestamp && !message.glow ? `<span class="message-time">${escapeHtml(message.timestamp)}</span>` : ''}
       </div>
+    </div>
+  `;
+}
+
+function renderRecommendationCards(recommendations) {
+  return `
+    <div class="rec-list">
+      ${recommendations.map((rec) => {
+        const level = rec.level ? `<span class="rec-card-level">${escapeHtml(rec.level)}</span>` : '';
+        return `
+          <button type="button" class="rec-card" data-rec-url="${escapeHtml(rec.url || '')}" data-rec-problem="${escapeHtml(String(rec.problemId || ''))}">
+            <span class="rec-card-head">${escapeHtml(rec.title || '문제')} ${level}</span>
+            ${rec.reason ? `<span class="rec-card-reason">${escapeHtml(rec.reason)}</span>` : ''}
+          </button>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -736,6 +760,16 @@ function bindEvents() {
       handleSubmissionResultSelect(button.dataset.submissionResult || '');
     });
   });
+
+  document.querySelectorAll('[data-recommend-trigger]').forEach((button) => {
+    button.addEventListener('click', fetchRecommendations);
+  });
+
+  document.querySelectorAll('[data-rec-url]').forEach((button) => {
+    button.addEventListener('click', () => {
+      openProblemUrl(button.dataset.recUrl || '');
+    });
+  });
 }
 
 function handleStageSelect(value) {
@@ -917,6 +951,7 @@ async function dispatchHintRequest(hintRequest, displayText) {
       id: Date.now() + 1,
       role: 'ai',
       text: response && response.answer ? response.answer : '응답을 받지 못했습니다.',
+      suggestConceptDrill: Boolean(response && response.suggestConceptDrill),
       timestamp: nowLabel(),
     });
   } catch (error) {
@@ -924,6 +959,76 @@ async function dispatchHintRequest(hintRequest, displayText) {
       id: Date.now() + 2,
       role: 'ai',
       text: `요청 중 오류가 발생했습니다. ${error.message}`,
+      timestamp: nowLabel(),
+    });
+  } finally {
+    state.busy = false;
+    renderShell();
+  }
+}
+
+function openProblemUrl(url) {
+  if (!url) {
+    return;
+  }
+  if (typeof chrome !== 'undefined' && chrome.tabs && typeof chrome.tabs.create === 'function') {
+    chrome.tabs.create({ url });
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
+async function fetchRecommendations() {
+  if (state.busy || !state.onProgrammers) {
+    return;
+  }
+
+  const problemId = state.problemId || DEFAULT_PROBLEM_ID;
+  const baseUrl = ((state.apiConfig && state.apiConfig.baseUrl) || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+  state.busy = true;
+  renderShell();
+
+  try {
+    const response = await fetch(`${baseUrl}/api/recommend?problemId=${encodeURIComponent(problemId)}&limit=3`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const errorBody = await response.json();
+        if (errorBody.message) {
+          detail = `: ${errorBody.message}`;
+        }
+      } catch (_error) {
+        // ignore parse errors
+      }
+      throw new Error(`추천 요청 실패: ${response.status}${detail}`);
+    }
+
+    const data = await response.json();
+    const recommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
+    if (recommendations.length === 0) {
+      state.messages.push({
+        id: Date.now(),
+        role: 'ai',
+        text: '지금은 추천할 만한 비슷한 유형의 문제를 찾지 못했어요.',
+        timestamp: nowLabel(),
+      });
+    } else {
+      state.messages.push({
+        id: Date.now(),
+        role: 'ai',
+        text: '이 유형을 먼저 가볍게 연습해볼 문제예요. 눌러서 풀어본 뒤 원래 문제로 돌아와요!',
+        recommendations,
+        timestamp: nowLabel(),
+      });
+    }
+  } catch (error) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: `추천 요청 중 오류가 발생했어요. ${error.message}`,
       timestamp: nowLabel(),
     });
   } finally {

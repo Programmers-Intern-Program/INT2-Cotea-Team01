@@ -1024,3 +1024,58 @@ button {
   background: rgba(27, 42, 74, 0.04);
 }
 
+/* 관련 유형 문제 추천 (개념 우회) */
+.concept-drill-chip {
+  cursor: pointer;
+  border-color: rgba(59, 102, 214, 0.35);
+  background: rgba(59, 102, 214, 0.1);
+  color: #274bb0;
+}
+
+.rec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(27, 42, 74, 0.12);
+  background: rgba(59, 102, 214, 0.05);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.rec-card:hover {
+  border-color: rgba(59, 102, 214, 0.4);
+  background: rgba(59, 102, 214, 0.1);
+}
+
+.rec-card-head {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1b2a4a;
+}
+
+.rec-card-level {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(27, 42, 74, 0.1);
+  color: rgba(27, 42, 74, 0.7);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rec-card-reason {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(27, 42, 74, 0.62);
+}
+
