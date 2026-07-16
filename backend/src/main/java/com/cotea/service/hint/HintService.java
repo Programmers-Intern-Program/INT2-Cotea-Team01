@@ -35,6 +35,8 @@ public class HintService {
     private final HintSelfReviewService hintSelfReviewService;
     private final OffTopicQuestionClassifier offTopicQuestionClassifier;
     private final OffTopicLlmRouter offTopicLlmRouter;
+    private final ConceptGapClassifier conceptGapClassifier;
+    private final ConceptGapLlmSignal conceptGapLlmSignal;
     private final CoteaProperties coteaProperties;
 
     public HintResponse generate(HintRequest request) {
@@ -52,7 +54,8 @@ public class HintService {
         if (offTopic) {
             return generateOffTopic(request, policy, problem, hintLevel, question);
         }
-        return generateRelated(request, policy, problem, hintLevel, question);
+        boolean conceptGap = conceptGapClassifier.isConceptGap(request, question);
+        return generateRelated(request, policy, problem, hintLevel, question, conceptGap);
     }
 
     private HintResponse generateRelated(
@@ -60,13 +63,18 @@ public class HintService {
             JsonNode policy,
             JsonNode problem,
             int hintLevel,
-            String question
+            String question,
+            boolean conceptGap
     ) {
         List<String> tags = problemContextSelector.extractTags(problem);
         ObjectNode problemContext = problemContextSelector.select(problem, policy, request, hintLevel);
         List<RagChunk> ragChunks = ragRetrievalService.retrieve(tags, hintLevel, question);
 
+        boolean llmSignalApplicable = conceptGapLlmSignal.isApplicable(request);
         String systemPrompt = promptAssembler.buildSystemPrompt(policy, hintLevel, request);
+        if (llmSignalApplicable) {
+            systemPrompt = systemPrompt + conceptGapLlmSignal.instruction();
+        }
         String userMessage;
         try {
             userMessage = promptAssembler.buildUserMessage(request, problemContext, ragChunks);
@@ -81,6 +89,7 @@ public class HintService {
                     .llmProvider("claude")
                     .stage(request.getStage())
                     .hintLevel(hintLevel)
+                    .suggestConceptDrill(conceptGap)
                     .tags(tags)
                     .systemPrompt(systemPrompt)
                     .userMessage(userMessage)
@@ -88,12 +97,27 @@ public class HintService {
                     .build();
         }
 
-        String responseText = llmClient.generate(
+        String rawText = llmClient.generate(
                 systemPrompt,
                 request.getConversationHistory(),
                 userMessage
         );
+
+        // 마커는 가드레일/셀프리뷰보다 먼저 제거해 사용자 노출 및 재검수 오염을 막는다.
+        String responseText;
+        boolean llmConceptGap = false;
+        if (llmSignalApplicable) {
+            ConceptGapLlmSignal.Parsed parsed = conceptGapLlmSignal.parse(rawText);
+            responseText = parsed.text();
+            llmConceptGap = parsed.conceptGap().orElse(false);
+        } else {
+            responseText = rawText;
+        }
         responseText = applyGuardrailIfNeeded(policy, request, hintLevel, userMessage, responseText);
+
+        boolean suggestConceptDrill = conceptGap || llmConceptGap;
+        log.info("[CONCEPT_GAP] problemId={} rule={} llm={} suggest={}",
+                request.getProblemId(), conceptGap, llmConceptGap, suggestConceptDrill);
 
         return HintResponse.builder()
                 .responseText(responseText)
@@ -101,6 +125,7 @@ public class HintService {
                 .llmProvider("claude")
                 .stage(request.getStage())
                 .hintLevel(hintLevel)
+                .suggestConceptDrill(suggestConceptDrill)
                 .build();
     }
 
