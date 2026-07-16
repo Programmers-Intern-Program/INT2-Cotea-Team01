@@ -915,10 +915,11 @@ async function handleSync() {
       }
     }
   } catch (error) {
+    console.error('[Cotea] 코드 동기화 실패:', error.message);
     state.messages.push({
       id: Date.now(),
       role: 'ai',
-      text: `코드 동기화 중 오류가 발생했습니다. ${error.message}`,
+      text: '코드 동기화 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       timestamp: nowLabel(),
     });
   } finally {
@@ -943,10 +944,6 @@ async function dispatchHintRequest(hintRequest, displayText) {
       hintRequest,
     });
 
-    if (response && response.source === 'error') {
-      throw new Error(response.answer || '응답 생성 중 오류가 발생했습니다.');
-    }
-
     state.messages.push({
       id: Date.now() + 1,
       role: 'ai',
@@ -955,10 +952,11 @@ async function dispatchHintRequest(hintRequest, displayText) {
       timestamp: nowLabel(),
     });
   } catch (error) {
+    console.error('[Cotea] 힌트 요청 실패:', error.message);
     state.messages.push({
       id: Date.now() + 2,
       role: 'ai',
-      text: `요청 중 오류가 발생했습니다. ${error.message}`,
+      text: '오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       timestamp: nowLabel(),
     });
   } finally {
@@ -1025,10 +1023,11 @@ async function fetchRecommendations() {
       });
     }
   } catch (error) {
+    console.error('[Cotea] 추천 요청 실패:', error.message);
     state.messages.push({
       id: Date.now(),
       role: 'ai',
-      text: `추천 요청 중 오류가 발생했어요. ${error.message}`,
+      text: '추천 요청 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.',
       timestamp: nowLabel(),
     });
   } finally {
@@ -1078,10 +1077,11 @@ async function initialize() {
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
   } catch (error) {
+    console.error('[Cotea] 초기 상태 조회 실패:', error.message);
     state.messages.push({
       id: Date.now() + 3,
       role: 'ai',
-      text: `초기 상태를 불러오지 못했습니다. ${error.message}`,
+      text: '초기 상태를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
       timestamp: nowLabel(),
     });
   }
