@@ -269,6 +269,7 @@ async function requestHintFromApi(message) {
     source: 'api',
     hintLevel: data.hintLevel,
     stage: data.stage,
+    suggestConceptDrill: Boolean(data.suggestConceptDrill),
   };
 }
 
