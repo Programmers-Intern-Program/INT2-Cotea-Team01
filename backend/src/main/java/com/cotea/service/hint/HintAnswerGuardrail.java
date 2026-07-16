@@ -65,7 +65,7 @@ public class HintAnswerGuardrail {
             List<String> riskSignals
     ) {
         for (String term : terms) {
-            if (answer.contains(term)) {
+            if (KoreanBoundaryMatcher.containsAsStandaloneTerm(answer, term)) {
                 riskSignals.add(prefix + ": " + term);
             }
         }

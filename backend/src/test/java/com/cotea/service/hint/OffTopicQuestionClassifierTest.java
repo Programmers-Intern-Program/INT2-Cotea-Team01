@@ -46,6 +46,20 @@ class OffTopicQuestionClassifierTest {
         assertThat(classifier.isOffTopic(request, "오늘 점심 뭐 먹지?")).isTrue();
     }
 
+    @Test
+    void wordSharingPrefixWithShortRelatedTermIsOffTopic() {
+        HintRequest request = freeTextRequest();
+
+        assertThat(classifier.isOffTopic(request, "정육면체 큐브는 어떻게 조립하나요")).isTrue();
+    }
+
+    @Test
+    void shortRelatedTermFollowedByParticleIsRelated() {
+        HintRequest request = freeTextRequest();
+
+        assertThat(classifier.isOffTopic(request, "큐를 어떻게 써야 하나요")).isFalse();
+    }
+
     private HintRequest freeTextRequest() {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);
