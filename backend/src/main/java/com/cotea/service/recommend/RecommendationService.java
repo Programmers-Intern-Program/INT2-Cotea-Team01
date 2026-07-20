@@ -3,6 +3,7 @@ package com.cotea.service.recommend;
 import com.cotea.controller.dto.RecommendationResponse;
 import com.cotea.controller.dto.RecommendedProblem;
 import com.cotea.exception.CoteaException;
+import com.cotea.service.auth.JwtTokenProvider;
 import com.cotea.service.problem.ProblemClassificationRepository;
 import com.cotea.service.problem.ProblemMetaRepository;
 import com.cotea.service.problem.entity.ProblemClassificationEntity;
@@ -22,9 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 현재 막힌 문제를 기준으로 "같은 유형(태그)의 더 쉬운/유사한 문제"를 추천한다.
  *
- * <p>로그인·로그 저장 없이 stateless로 동작한다. 랭킹은 (1) 공유 태그 수, (2) subcategory 일치,
- * (3) 더 쉬운 난이도 우선을 가산점으로 합산해 결정한다. 후보가 부족한 태그도 같은 태그면
- * 최소한 노출되도록 하드 필터는 두지 않는다.
+ * <p>로그인 사용자는 {@link UserWeaknessProvider} 프로필(푼 문제 제외·약점 태그 가중)을 반영한다.
+ * 비로그인·프로필 없음은 태그 기반 stateless와 동일하게 동작한다.
  */
 @Slf4j
 @Service
@@ -32,12 +32,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecommendationService {
 
     private static final int DEFAULT_LIMIT = 3;
+    /** weakTagCounts 1회당 가산점 상한 (태그별) */
+    private static final int WEAK_TAG_SCORE_CAP = 12;
 
     private final ProblemMetaRepository problemMetaRepository;
     private final ProblemClassificationRepository classificationRepository;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserWeaknessProvider userWeaknessProvider;
 
     @Transactional(readOnly = true)
     public RecommendationResponse recommend(int problemId, List<String> tagOverride, Integer limit) {
+        return recommend(problemId, tagOverride, limit, null);
+    }
+
+    @Transactional(readOnly = true)
+    public RecommendationResponse recommend(
+            int problemId,
+            List<String> tagOverride,
+            Integer limit,
+            String authorization
+    ) {
+        UserRecommendationProfile profile = jwtTokenProvider.resolveUserId(authorization)
+                .map(userWeaknessProvider::getProfile)
+                .orElse(UserRecommendationProfile.empty());
         ProblemEntity source = problemMetaRepository.findById(problemId)
                 .orElseThrow(() -> new CoteaException(
                         "MISSING_PROBLEM_ID",
@@ -63,6 +80,7 @@ public class RecommendationService {
         Map<Integer, List<ProblemClassificationEntity>> byProblem =
                 classificationRepository.findByTagIn(sourceTags).stream()
                         .filter(c -> !c.getProblemId().equals(problemId))
+                        .filter(c -> !profile.solvedProblemIds().contains(c.getProblemId()))
                         .collect(Collectors.groupingBy(ProblemClassificationEntity::getProblemId));
 
         if (byProblem.isEmpty()) {
@@ -81,7 +99,7 @@ public class RecommendationService {
         int max = (limit == null || limit <= 0) ? DEFAULT_LIMIT : limit;
         List<RecommendedProblem> recommendations = byProblem.entrySet().stream()
                 .map(e -> toCandidate(e.getKey(), e.getValue(), candidateProblems.get(e.getKey()),
-                        sourceTagSub, sourceLevel))
+                        sourceTagSub, sourceLevel, profile))
                 .filter(c -> c != null)
                 .sorted(Comparator
                         .comparingInt(Candidate::score).reversed()
@@ -91,8 +109,8 @@ public class RecommendationService {
                 .map(this::toDto)
                 .collect(Collectors.toList());
 
-        log.info("[RECOMMEND] problemId={} tags={} candidates={} returned={}",
-                problemId, sourceTags, byProblem.size(), recommendations.size());
+        log.info("[RECOMMEND] problemId={} tags={} candidates={} returned={} personalized={}",
+                problemId, sourceTags, byProblem.size(), recommendations.size(), profile.hasPersonalization());
 
         return RecommendationResponse.builder()
                 .sourceProblemId(problemId)
@@ -118,7 +136,8 @@ public class RecommendationService {
                                   List<ProblemClassificationEntity> sharedRows,
                                   ProblemEntity problem,
                                   Set<String> sourceTagSub,
-                                  Integer sourceLevel) {
+                                  Integer sourceLevel,
+                                  UserRecommendationProfile profile) {
         if (problem == null) {
             return null;
         }
@@ -146,6 +165,7 @@ public class RecommendationService {
             score += 15;
         }
         score += levelScore(level, sourceLevel);
+        score += weaknessTagBonus(sharedTags, profile.weakTagCounts());
 
         Candidate candidate = new Candidate();
         candidate.problemId = candidateId;
@@ -156,6 +176,20 @@ public class RecommendationService {
         candidate.sourceLevel = sourceLevel;
         candidate.score = score;
         return candidate;
+    }
+
+    private int weaknessTagBonus(Set<String> sharedTags, Map<String, Long> weakTagCounts) {
+        if (weakTagCounts == null || weakTagCounts.isEmpty()) {
+            return 0;
+        }
+        int bonus = 0;
+        for (String tag : sharedTags) {
+            long count = weakTagCounts.getOrDefault(tag, 0L);
+            if (count > 0) {
+                bonus += Math.min((int) count * 2, WEAK_TAG_SCORE_CAP);
+            }
+        }
+        return bonus;
     }
 
     private int levelScore(Integer candidateLevel, Integer sourceLevel) {

@@ -1015,8 +1015,13 @@ async function fetchRecommendations() {
   renderShell();
 
   try {
+    const headers = {};
+    if (state.authState && state.authState.accessToken) {
+      headers.Authorization = `${state.authState.tokenType || 'Bearer'} ${state.authState.accessToken}`;
+    }
     const response = await fetch(`${baseUrl}/api/recommend?problemId=${encodeURIComponent(problemId)}&limit=3`, {
       method: 'GET',
+      headers,
     });
 
     if (!response.ok) {

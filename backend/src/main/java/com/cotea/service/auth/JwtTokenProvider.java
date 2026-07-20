@@ -6,12 +6,13 @@ import com.cotea.service.auth.entity.UserEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
@@ -52,13 +53,31 @@ public class JwtTokenProvider {
         return properties.getJwt().getAccessTokenTtlSeconds();
     }
 
-    public Long parseUserId(String bearerToken) {
+    /**
+     * Authorization 헤더에서 userId를 추출한다. 토큰이 없거나 유효하지 않으면 empty(게스트).
+     * 추천 API 등 선택적 인증 경로에서 사용한다.
+     */
+    public Optional<Long> resolveUserId(String authorization) {
+        if (authorization == null || authorization.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(parseUserId(authorization));
+        } catch (CoteaException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Authorization 헤더에서 userId를 추출한다. 유효하지 않으면 401.
+     */
+    public Long parseUserId(String authorization) {
         validateJwtConfig();
-        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
             throw new CoteaException("AUTH_REQUIRED", "인증 토큰이 필요합니다.", 401);
         }
 
-        String token = bearerToken.substring("Bearer ".length()).trim();
+        String token = authorization.substring("Bearer ".length()).trim();
         String[] parts = token.split("\\.");
         if (parts.length != 3) {
             throw new CoteaException("INVALID_AUTH_TOKEN", "인증 토큰 형식이 올바르지 않습니다.", 401);
