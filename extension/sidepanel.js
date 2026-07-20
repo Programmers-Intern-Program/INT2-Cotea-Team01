@@ -915,7 +915,7 @@ async function handleSync() {
       }
     }
   } catch (error) {
-    console.error('[Cotea] 코드 동기화 실패:', error.message);
+    console.error('[Cotea] 코드 동기화 실패:', error);
     state.messages.push({
       id: Date.now(),
       role: 'ai',
