@@ -806,7 +806,8 @@ function applyGradingResult(gradingResult) {
   if (!state.submissionResult) {
     state.submissionResult = 'WRONG_ANSWER';
   }
-  pushStageDivider(alreadyInWrongAnswerFlow ? '채점 결과 자동 감지: 다시 실패했어요' : '채점 결과 자동 감지: 오답이에요');
+  const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
+  pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요` : `${sourceLabel} 자동 감지: 오답이에요`);
 }
 
 function handleHintLevelSelect(level) {
