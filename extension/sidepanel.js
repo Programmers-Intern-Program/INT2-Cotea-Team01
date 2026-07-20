@@ -1023,7 +1023,7 @@ async function fetchRecommendations() {
       });
     }
   } catch (error) {
-    console.error('[Cotea] 추천 요청 실패:', error.message);
+    console.error('[Cotea] 추천 요청 실패:', error);
     state.messages.push({
       id: Date.now(),
       role: 'ai',
