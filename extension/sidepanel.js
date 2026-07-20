@@ -797,6 +797,12 @@ function applyGradingResult(gradingResult) {
   if (!gradingResult || gradingResult.passed !== false) {
     return;
   }
+  // problemId가 없거나(파싱 실패) 지금 보고 있는 문제와 다르면 무시한다.
+  // 다른 탭에서 감지된 결과가 지금 패널에 잘못 반영되는 것을 막기 위함이라,
+  // 호출부(초기 로딩/실시간 반영) 둘 다 이 한 곳만 거치면 되도록 여기서 검사한다.
+  if (gradingResult.problemId == null || gradingResult.problemId !== state.problemId) {
+    return;
+  }
 
   const alreadyInWrongAnswerFlow = state.stage === 'WRONG_ANSWER';
   state.stage = 'WRONG_ANSWER';
@@ -1104,8 +1110,8 @@ async function initialize() {
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
 
     // 패널을 열기 전에 이미 코드 실행/채점을 해서 저장돼있던 결과가 있으면
-    // (같은 문제일 때만) 지금 막 감지된 것처럼 반영한다.
-    if (response && response.gradingResult && response.gradingResult.problemId === state.problemId) {
+    // 지금 막 감지된 것처럼 반영한다. 문제 ID 일치 여부는 applyGradingResult가 검사한다.
+    if (response && response.gradingResult) {
       pendingGradingResult = response.gradingResult;
     }
   } catch (error) {
