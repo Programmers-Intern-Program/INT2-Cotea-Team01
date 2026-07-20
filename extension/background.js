@@ -327,6 +327,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       apiConfig: DEFAULT_API_CONFIG,
       authState: null,
       codeDirty: false,
+      gradingResult: null,
     })
       .then((state) => sendResponse(state))
       .catch((error) => {

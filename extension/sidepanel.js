@@ -1091,6 +1091,7 @@ function refreshActiveTabStatus() {
 }
 
 async function initialize() {
+  let pendingGradingResult = null;
   try {
     const response = await sendRuntimeMessage({ type: 'GET_PANEL_STATE' });
     state.latestCode = response && response.latestCode ? response.latestCode : '';
@@ -1101,6 +1102,12 @@ async function initialize() {
     state.codeDirty = Boolean(response && response.codeDirty);
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
+
+    // 패널을 열기 전에 이미 코드 실행/채점을 해서 저장돼있던 결과가 있으면
+    // (같은 문제일 때만) 지금 막 감지된 것처럼 반영한다.
+    if (response && response.gradingResult && response.gradingResult.problemId === state.problemId) {
+      pendingGradingResult = response.gradingResult;
+    }
   } catch (error) {
     console.error('[Cotea] 초기 상태 조회 실패:', error);
     state.messages.push({
@@ -1113,6 +1120,9 @@ async function initialize() {
 
   await syncPageContext();
   ensureWelcomeMessage();
+  if (pendingGradingResult) {
+    applyGradingResult(pendingGradingResult);
+  }
   refreshActiveTabStatus();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
