@@ -135,13 +135,17 @@ public class HintSelfReviewService {
      * A/B/C 정책 결정에 참고한다. logs/cotea.log(전체)와 logs/self-review.log(이 로그만) 양쪽에 남는다.
      */
     private void logReviewOutcome(JsonNode root) {
-        boolean passed = root.path("passed").asBoolean(true);
-        JsonNode violations = root.path("violations");
-        MDC.put("logType", "self-review");
         try {
-            log.info("[SELF_REVIEW] passed={} violations={}", passed, violations);
-        } finally {
-            MDC.remove("logType");
+            boolean passed = root.path("passed").asBoolean(true);
+            JsonNode violations = root.path("violations");
+            MDC.put("logType", "self-review");
+            try {
+                log.info("[SELF_REVIEW] passed={} violations={}", passed, violations);
+            } finally {
+                MDC.remove("logType");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to log self-review outcome.", e);
         }
     }
 
