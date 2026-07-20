@@ -914,7 +914,7 @@ async function handleSync() {
       }
     }
   } catch (error) {
-    console.error('[Cotea] 코드 동기화 실패:', error.message);
+    console.error('[Cotea] 코드 동기화 실패:', error);
     state.messages.push({
       id: Date.now(),
       role: 'ai',
@@ -951,7 +951,7 @@ async function dispatchHintRequest(hintRequest, displayText) {
       timestamp: nowLabel(),
     });
   } catch (error) {
-    console.error('[Cotea] 힌트 요청 실패:', error.message);
+    console.error('[Cotea] 힌트 요청 실패:', error);
     state.messages.push({
       id: Date.now() + 2,
       role: 'ai',
@@ -1022,7 +1022,7 @@ async function fetchRecommendations() {
       });
     }
   } catch (error) {
-    console.error('[Cotea] 추천 요청 실패:', error.message);
+    console.error('[Cotea] 추천 요청 실패:', error);
     state.messages.push({
       id: Date.now(),
       role: 'ai',
@@ -1082,7 +1082,7 @@ async function initialize() {
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
   } catch (error) {
-    console.error('[Cotea] 초기 상태 조회 실패:', error.message);
+    console.error('[Cotea] 초기 상태 조회 실패:', error);
     state.messages.push({
       id: Date.now() + 3,
       role: 'ai',

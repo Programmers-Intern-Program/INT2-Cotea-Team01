@@ -58,6 +58,25 @@ class HintAnswerGuardrailTest {
         assertThat(result.riskSignals()).contains("Lv3 이하 코드블록 포함");
     }
 
+    @Test
+    void doesNotFlagUnrelatedWordSharingPrefixWithForbiddenTerm() {
+        HintRequest request = beforeSolveRequest(1, "hint_level_1");
+
+        GuardrailResult result = guardrail.inspect("이 문제는 큐브 모양으로 생각해보면 도움이 됩니다.", request, 1);
+
+        assertThat(result.needsReview()).isFalse();
+    }
+
+    @Test
+    void flagsForbiddenTermFollowedByParticleWithoutSpace() {
+        HintRequest request = beforeSolveRequest(1, "hint_level_1");
+
+        GuardrailResult result = guardrail.inspect("이 문제는 큐를 사용하면 됩니다.", request, 1);
+
+        assertThat(result.needsReview()).isTrue();
+        assertThat(result.riskSignals()).contains("Lv1 금지어 포함: 큐");
+    }
+
     private HintRequest beforeSolveRequest(int hintLevel, String buttonId) {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);
