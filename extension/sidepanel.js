@@ -1043,6 +1043,12 @@ async function handleSend() {
     return;
   }
 
+  state.busy = true;
+  renderShell();
+  // 질문을 보내기 직전에 항상 최신 코드로 재동기화한다 (수동 동기화 버튼에만
+  // 의존하면 사용자가 깜빡했을 때 낡은 코드가 힌트 API로 전송될 수 있음)
+  await syncPageContext();
+
   const hintRequest = buildHintRequest(question, chipLabel);
   state.input = '';
   state.activeChip = null;
