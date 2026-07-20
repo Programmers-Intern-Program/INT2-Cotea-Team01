@@ -5,6 +5,8 @@ import com.cotea.config.CoteaProperties;
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.controller.dto.HintResponse;
 import com.cotea.exception.CoteaException;
+import com.cotea.service.learning.HintLogContext;
+import com.cotea.service.learning.LearningLogService;
 import com.cotea.service.policy.PromptPolicyLoader;
 import com.cotea.service.problem.ProblemMetaService;
 import com.cotea.service.rag.RagChunk;
@@ -41,8 +43,13 @@ public class HintService {
     private final ConceptGapClassifier conceptGapClassifier;
     private final ConceptGapLlmSignal conceptGapLlmSignal;
     private final CoteaProperties coteaProperties;
+    private final LearningLogService learningLogService;
 
     public HintResponse generate(HintRequest request) {
+        return generate(request, null);
+    }
+
+    public HintResponse generate(HintRequest request, String authorization) {
         hintRequestValidator.validate(request);
 
         JsonNode policy = promptPolicyLoader.getPolicy();
@@ -55,10 +62,10 @@ public class HintService {
                 && offTopicQuestionClassifier.isOffTopic(request, question);
 
         if (offTopic) {
-            return generateOffTopic(request, policy, problem, hintLevel, question);
+            return generateOffTopic(request, policy, problem, hintLevel, question, authorization);
         }
         boolean conceptGap = conceptGapClassifier.isConceptGap(request, question);
-        return generateRelated(request, policy, problem, hintLevel, question, conceptGap);
+        return generateRelated(request, policy, problem, hintLevel, question, conceptGap, authorization);
     }
 
     private HintResponse generateRelated(
@@ -67,7 +74,8 @@ public class HintService {
             JsonNode problem,
             int hintLevel,
             String question,
-            boolean conceptGap
+            boolean conceptGap,
+            String authorization
     ) {
         List<String> tags = problemContextSelector.extractTags(problem);
         ObjectNode problemContext = problemContextSelector.select(problem, policy, request, hintLevel);
@@ -133,7 +141,7 @@ public class HintService {
         log.info("[CONCEPT_GAP] problemId={} rule={} llm={} suggest={}",
                 request.getProblemId(), conceptGap, llmConceptGap, suggestConceptDrill);
 
-        return HintResponse.builder()
+        HintResponse response = HintResponse.builder()
                 .responseText(responseText)
                 .route("RELATED")
                 .llmProvider("claude")
@@ -141,6 +149,16 @@ public class HintService {
                 .hintLevel(hintLevel)
                 .suggestConceptDrill(suggestConceptDrill)
                 .build();
+        learningLogService.saveIfAuthenticated(authorization, request, new HintLogContext(
+                policy,
+                problem,
+                problemContext,
+                tags,
+                question,
+                "RELATED",
+                "claude"
+        ));
+        return response;
     }
 
     private HintResponse generateOffTopic(
@@ -148,7 +166,8 @@ public class HintService {
             JsonNode policy,
             JsonNode problem,
             int hintLevel,
-            String question
+            String question,
+            String authorization
     ) {
         String title = problem.path("source").path("title").asText("");
         String level = problem.path("source").path("level").asText("");
@@ -184,13 +203,24 @@ public class HintService {
                 Set.of()
         );
 
-        return HintResponse.builder()
+        List<String> tags = problemContextSelector.extractTags(problem);
+        HintResponse response = HintResponse.builder()
                 .responseText(responseText)
                 .route("OFF_TOPIC")
                 .llmProvider(result.getLlmProvider())
                 .stage(request.getStage())
                 .hintLevel(hintLevel)
                 .build();
+        learningLogService.saveIfAuthenticated(authorization, request, new HintLogContext(
+                policy,
+                problem,
+                null,
+                tags,
+                question,
+                "OFF_TOPIC",
+                result.getLlmProvider()
+        ));
+        return response;
     }
 
     private String applyGuardrailIfNeeded(
