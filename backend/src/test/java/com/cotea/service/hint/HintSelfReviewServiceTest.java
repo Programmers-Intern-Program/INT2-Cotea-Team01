@@ -2,6 +2,9 @@ package com.cotea.service.hint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.cotea.client.LlmClient;
 import com.cotea.controller.dto.ConversationMessage;
 import com.cotea.controller.dto.HintRequest;
@@ -9,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 
 class HintSelfReviewServiceTest {
@@ -60,6 +64,72 @@ class HintSelfReviewServiceTest {
         );
 
         assertThat(result).isEqualTo("초안 답변");
+    }
+
+    @Test
+    void returnsFinalAnswerWhenPassedFieldIsMissing() throws Exception {
+        LlmClient llmClient = new StubLlmClient("""
+                {
+                  "finalAnswer": "다음 상태는 어떻게 정의할 수 있을까요?"
+                }
+                """);
+        HintSelfReviewService service = new HintSelfReviewService(
+                llmClient,
+                objectMapper,
+                new QuestionResolver()
+        );
+
+        String result = service.reviewAndFix(
+                policy(),
+                beforeSolveRequest(),
+                1,
+                "user message",
+                "초안 답변",
+                GuardrailResult.review(List.of("위험 신호"))
+        );
+
+        assertThat(result).isEqualTo("다음 상태는 어떻게 정의할 수 있을까요?");
+    }
+
+    @Test
+    void logsReviewOutcomeWithSelfReviewLogTypeForObservability() throws Exception {
+        LlmClient llmClient = new StubLlmClient("""
+                {
+                  "passed": false,
+                  "violations": ["Lv1 금지어 포함"],
+                  "finalAnswer": "다음 상태는 어떻게 정의할 수 있을까요?"
+                }
+                """);
+        HintSelfReviewService service = new HintSelfReviewService(
+                llmClient,
+                objectMapper,
+                new QuestionResolver()
+        );
+
+        Logger logger = (Logger) LoggerFactory.getLogger(HintSelfReviewService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            service.reviewAndFix(
+                    policy(),
+                    beforeSolveRequest(),
+                    1,
+                    "user message",
+                    "초안 답변",
+                    GuardrailResult.review(List.of("Lv1 금지어 포함: BFS"))
+            );
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        ILoggingEvent event = appender.list.stream()
+                .filter(e -> e.getFormattedMessage().contains("SELF_REVIEW"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("SELF_REVIEW 로그가 남지 않았습니다."));
+
+        assertThat(event.getMDCPropertyMap()).containsEntry("logType", "self-review");
+        assertThat(event.getFormattedMessage()).contains("passed=false");
     }
 
     private JsonNode policy() throws Exception {

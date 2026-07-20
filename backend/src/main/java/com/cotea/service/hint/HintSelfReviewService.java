@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -115,6 +116,7 @@ public class HintSelfReviewService {
     private String parseFinalAnswer(String reviewResponse, String fallbackAnswer) {
         try {
             JsonNode root = objectMapper.readTree(extractJson(reviewResponse));
+            logReviewOutcome(root);
             String finalAnswer = root.path("finalAnswer").asText();
             if (finalAnswer == null || finalAnswer.isBlank()) {
                 log.warn("Self-review response did not include finalAnswer.");
@@ -124,6 +126,22 @@ public class HintSelfReviewService {
         } catch (Exception e) {
             log.warn("Failed to parse self-review response. Returning draft answer.", e);
             return fallbackAnswer;
+        }
+    }
+
+    /**
+     * 재검수 결과(passed/violations)를 동작에는 반영하지 않고 관측용으로만 남긴다.
+     * 실제로 passed:false가 얼마나 자주 나오는지 데이터가 쌓이면, report05 2번 항목의
+     * A/B/C 정책 결정에 참고한다. logs/cotea.log(전체)와 logs/self-review.log(이 로그만) 양쪽에 남는다.
+     */
+    private void logReviewOutcome(JsonNode root) {
+        boolean passed = root.path("passed").asBoolean(true);
+        JsonNode violations = root.path("violations");
+        MDC.put("logType", "self-review");
+        try {
+            log.info("[SELF_REVIEW] passed={} violations={}", passed, violations);
+        } finally {
+            MDC.remove("logType");
         }
     }
 

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Spring Boot 기본 CONSOLE + FILE(logging.file.name 기준 logs/cotea.log) 어펜더를 그대로 가져오고 확장한다. -->
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <!--
+      MDC.put("logType", "원하는이름")으로 감싼 로그만 logs/{logType}.log에도 추가로 남긴다.
+      전체 로그는 base.xml의 FILE 어펜더(logs/cotea.log)에 이미 다 쌓이므로, 이건 그 중 일부를
+      용도별로 복제하는 용도다. 새 용도가 필요하면 이 파일은 건드릴 필요 없이 코드에서
+      MDC.put("logType", "새이름")만 추가하면 logs/새이름.log가 자동으로 생긴다.
+    -->
+    <appender name="TOPIC_FILE" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <filter class="com.cotea.config.logging.LogTypeFilter"/>
+        <discriminator>
+            <key>logType</key>
+            <defaultValue>untagged</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="TOPIC-${logType}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>logs/${logType}.log</file>
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <fileNamePattern>logs/${logType}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+                    <maxFileSize>10MB</maxFileSize>
+                    <maxHistory>30</maxHistory>
+                </rollingPolicy>
+                <encoder>
+                    <pattern>${FILE_LOG_PATTERN}</pattern>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="TOPIC_FILE"/>
+    </root>
+</configuration>
