@@ -12,8 +12,11 @@ import com.cotea.service.problem.ProblemClassificationRepository;
 import com.cotea.service.problem.ProblemMetaRepository;
 import com.cotea.service.problem.entity.ProblemClassificationEntity;
 import com.cotea.service.problem.entity.ProblemEntity;
+import com.cotea.service.auth.JwtTokenProvider;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +34,12 @@ class RecommendationServiceTest {
     @Mock
     private ProblemClassificationRepository classificationRepository;
 
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private UserWeaknessProvider userWeaknessProvider;
+
     @InjectMocks
     private RecommendationService recommendationService;
 
@@ -38,6 +47,7 @@ class RecommendationServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(jwtTokenProvider.resolveUserId(any())).thenReturn(Optional.empty());
         source = problem(1829, "카카오프렌즈 컬러링북", "Lv2");
         addClassification(source, "bfs", null);
     }
@@ -131,6 +141,45 @@ class RecommendationServiceTest {
         assertThatThrownBy(() -> recommendationService.recommend(404404, null, null))
                 .isInstanceOf(CoteaException.class)
                 .hasMessageContaining("404404");
+    }
+
+    @Test
+    void 프로필에_푼_문제는_추천에서_제외한다() {
+        when(jwtTokenProvider.resolveUserId("Bearer token")).thenReturn(Optional.of(1L));
+        when(userWeaknessProvider.getProfile(1L)).thenReturn(
+                new UserRecommendationProfile(Set.of(100), Map.of()));
+        when(problemMetaRepository.findById(1829)).thenReturn(Optional.of(source));
+        when(classificationRepository.findByTagIn(any())).thenReturn(List.of(
+                classification(100, "bfs", null),
+                classification(200, "bfs", null)));
+        when(problemMetaRepository.findAllById(any())).thenReturn(List.of(
+                problem(100, "이미 푼 BFS", "Lv1"),
+                problem(200, "새 BFS", "Lv1")));
+
+        RecommendationResponse response = recommendationService.recommend(1829, null, null, "Bearer token");
+
+        assertThat(response.getRecommendations()).hasSize(1);
+        assertThat(response.getRecommendations().get(0).getProblemId()).isEqualTo(200);
+    }
+
+    @Test
+    void 약점_태그가_있으면_해당_태그_후보에_가산점을_준다() {
+        addClassification(source, "dfs", null);
+        when(jwtTokenProvider.resolveUserId("Bearer token")).thenReturn(Optional.of(1L));
+        when(userWeaknessProvider.getProfile(1L)).thenReturn(
+                new UserRecommendationProfile(Set.of(), Map.of("bfs", 5L)));
+        when(problemMetaRepository.findById(1829)).thenReturn(Optional.of(source));
+        when(classificationRepository.findByTagIn(any())).thenReturn(List.of(
+                classification(100, "bfs", null),
+                classification(200, "dfs", null)));
+        when(problemMetaRepository.findAllById(any())).thenReturn(List.of(
+                problem(100, "BFS 연습", "Lv2"),
+                problem(200, "DFS 연습", "Lv2")));
+
+        RecommendationResponse response = recommendationService.recommend(1829, null, null, "Bearer token");
+
+        assertThat(response.getRecommendations()).hasSize(2);
+        assertThat(response.getRecommendations().get(0).getProblemId()).isEqualTo(100);
     }
 
     private static ProblemEntity problem(int id, String title, String level) {
