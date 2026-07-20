@@ -680,10 +680,7 @@ function bindEvents() {
 
   const reportButton = document.getElementById('report-button');
   if (reportButton) {
-    reportButton.addEventListener('click', () => {
-      state.reportNotice = '아직 준비중입니다';
-      renderShell();
-    });
+    reportButton.addEventListener('click', handleWeeklyReport);
   }
 
   const logoutButton = document.getElementById('logout-button');
@@ -876,6 +873,37 @@ async function handleLogout() {
   state.showLogin = false;
   state.reportNotice = '';
   renderShell();
+}
+
+async function handleWeeklyReport() {
+  state.reportNotice = '최근 7일 리포트를 불러오는 중입니다...';
+  renderShell();
+
+  try {
+    const response = await sendRuntimeMessage({ type: 'GET_WEEKLY_REPORT' });
+    if (!response || !response.ok) {
+      throw new Error((response && response.error) || '리포트를 불러오지 못했습니다.');
+    }
+    state.reportNotice = formatWeeklyReport(response.report);
+  } catch (error) {
+    state.reportNotice = error.message;
+  }
+  renderShell();
+}
+
+function formatWeeklyReport(report) {
+  if (!report || !report.totalHintCount) {
+    return '최근 7일 동안 저장된 힌트 요청이 없습니다.';
+  }
+
+  const topWeakness = report.topWeaknessTypes && report.topWeaknessTypes[0]
+    ? `${report.topWeaknessTypes[0].name} ${report.topWeaknessTypes[0].count}회`
+    : '약점 데이터 없음';
+  const topTag = report.topTags && report.topTags[0]
+    ? `${report.topTags[0].name} ${report.topTags[0].count}회`
+    : '태그 데이터 없음';
+
+  return `최근 ${report.periodDays}일 힌트 ${report.totalHintCount}회 · 주요 약점: ${topWeakness} · 자주 막힌 태그: ${topTag}`;
 }
 
 async function handleSync() {

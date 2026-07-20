@@ -4,6 +4,7 @@ import com.cotea.config.CoteaProperties;
 import com.cotea.exception.CoteaException;
 import com.cotea.service.auth.entity.UserEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -12,7 +13,6 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import com.fasterxml.jackson.databind.JsonNode;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
@@ -85,8 +85,7 @@ public class JwtTokenProvider {
 
         String unsignedToken = parts[0] + "." + parts[1];
         String expectedSignature = sign(unsignedToken);
-        if (!MessageDigest.isEqual(
-                expectedSignature.getBytes(StandardCharsets.UTF_8),
+        if (!MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8),
                 parts[2].getBytes(StandardCharsets.UTF_8))) {
             throw new CoteaException("INVALID_AUTH_TOKEN", "인증 토큰 서명이 올바르지 않습니다.", 401);
         }

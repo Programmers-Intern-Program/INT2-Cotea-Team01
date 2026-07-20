@@ -273,6 +273,24 @@ async function requestHintFromApi(message) {
   };
 }
 
+async function requestWeeklyReport() {
+  const { apiConfig, authState } = await getLocalState({
+    apiConfig: DEFAULT_API_CONFIG,
+    authState: null,
+  });
+  if (!authState || !authState.accessToken) {
+    throw new Error('로그인이 필요합니다.');
+  }
+
+  const baseUrl = normalizeApiBaseUrl(apiConfig);
+  return fetchJson(`${baseUrl}/api/reports/me/weekly`, {
+    method: 'GET',
+    headers: {
+      Authorization: `${authState.tokenType || 'Bearer'} ${authState.accessToken}`,
+    },
+  });
+}
+
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error(error));
@@ -334,6 +352,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'LOGOUT') {
     setLocalState({ authState: null })
       .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'GET_WEEKLY_REPORT') {
+    requestWeeklyReport()
+      .then((report) => sendResponse({ ok: true, report }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }

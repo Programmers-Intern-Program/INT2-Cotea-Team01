@@ -1,0 +1,17 @@
+package com.cotea.service.learning;
+
+public enum DetectedIntent {
+    APPROACH_UNKNOWN,
+    ALGORITHM_CONCEPT,
+    DATA_STRUCTURE,
+    IMPLEMENTATION_ORDER,
+    VISITED_HANDLING,
+    BOUNDARY_CONDITION,
+    STATE_DEFINITION,
+    TIME_COMPLEXITY,
+    DEBUG_REASON,
+    RUNTIME_REASON,
+    SYNTAX,
+    OFF_TOPIC,
+    ETC
+}
