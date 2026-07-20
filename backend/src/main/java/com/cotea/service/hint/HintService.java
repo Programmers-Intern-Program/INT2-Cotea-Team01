@@ -12,7 +12,9 @@ import com.cotea.service.rag.RagRetrievalService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ public class HintService {
     private final HintRequestValidator hintRequestValidator;
     private final HintAnswerGuardrail hintAnswerGuardrail;
     private final HintSelfReviewService hintSelfReviewService;
+    private final ForbiddenConceptLlmSignal forbiddenConceptLlmSignal;
     private final OffTopicQuestionClassifier offTopicQuestionClassifier;
     private final OffTopicLlmRouter offTopicLlmRouter;
     private final ConceptGapClassifier conceptGapClassifier;
@@ -75,6 +78,9 @@ public class HintService {
         if (llmSignalApplicable) {
             systemPrompt = systemPrompt + conceptGapLlmSignal.instruction();
         }
+        if (hintLevel == 1) {
+            systemPrompt = systemPrompt + forbiddenConceptLlmSignal.instruction();
+        }
         String userMessage;
         try {
             userMessage = promptAssembler.buildUserMessage(request, problemContext, ragChunks);
@@ -113,7 +119,15 @@ public class HintService {
         } else {
             responseText = rawText;
         }
-        responseText = applyGuardrailIfNeeded(policy, request, hintLevel, userMessage, responseText);
+        Set<String> selfReportedForbiddenConcepts = Set.of();
+        if (hintLevel == 1) {
+            ForbiddenConceptLlmSignal.Parsed forbiddenParsed = forbiddenConceptLlmSignal.parse(responseText);
+            responseText = forbiddenParsed.text();
+            selfReportedForbiddenConcepts = forbiddenParsed.forbiddenConcepts();
+        }
+        responseText = applyGuardrailIfNeeded(
+                policy, request, hintLevel, userMessage, responseText, selfReportedForbiddenConcepts
+        );
 
         boolean suggestConceptDrill = conceptGap || llmConceptGap;
         log.info("[CONCEPT_GAP] problemId={} rule={} llm={} suggest={}",
@@ -166,7 +180,8 @@ public class HintService {
                 request,
                 hintLevel,
                 userMessage,
-                result.getResponseText()
+                result.getResponseText(),
+                Set.of()
         );
 
         return HintResponse.builder()
@@ -183,9 +198,15 @@ public class HintService {
             HintRequest request,
             int hintLevel,
             String userMessage,
-            String responseText
+            String responseText,
+            Set<String> llmSelfReportedForbiddenConcepts
     ) {
         GuardrailResult guardrail = hintAnswerGuardrail.inspect(responseText, request, hintLevel);
+        if (!llmSelfReportedForbiddenConcepts.isEmpty()) {
+            List<String> merged = new ArrayList<>(guardrail.riskSignals());
+            llmSelfReportedForbiddenConcepts.forEach(concept -> merged.add("Lv1 금지어 자기신고: " + concept));
+            guardrail = GuardrailResult.review(merged);
+        }
         if (!guardrail.needsReview()) {
             return responseText;
         }

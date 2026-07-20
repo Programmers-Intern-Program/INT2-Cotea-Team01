@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class HintAnswerGuardrail {
 
-    private static final List<String> LEVEL_1_FORBIDDEN_TERMS = List.of(
+    /** package-private: {@link ForbiddenConceptLlmSignal}이 자기점검 마커 목록으로 동일 리스트를 재사용한다. */
+    static final List<String> LEVEL_1_FORBIDDEN_TERMS = List.of(
             "BFS", "DFS", "DP", "Union-Find", "유니온 파인드",
             "큐", "스택", "visited", "방문 배열"
     );
