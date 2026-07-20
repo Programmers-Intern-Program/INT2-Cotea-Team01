@@ -1077,7 +1077,7 @@ async function initialize() {
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
   } catch (error) {
-    console.error('[Cotea] 초기 상태 조회 실패:', error.message);
+    console.error('[Cotea] 초기 상태 조회 실패:', error);
     state.messages.push({
       id: Date.now() + 3,
       role: 'ai',
