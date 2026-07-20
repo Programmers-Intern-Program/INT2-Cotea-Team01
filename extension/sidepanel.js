@@ -790,6 +790,25 @@ function handleStageSelect(value) {
   renderShell();
 }
 
+function applyGradingResult(gradingResult) {
+  // 1차 범위: 합/불만 자동 감지하고, TLE/런타임에러 세부 구분은 하지 않은 채
+  // 모든 불합격을 기본값 오답(WRONG_ANSWER)으로 취급한다 (report05 논의 참고).
+  // 이미 사용자가 시간초과/런타임에러로 직접 고쳐놓은 값은 재감지 시에도 덮어쓰지 않는다.
+  if (!gradingResult || gradingResult.passed !== false) {
+    return;
+  }
+
+  const alreadyInWrongAnswerFlow = state.stage === 'WRONG_ANSWER';
+  state.stage = 'WRONG_ANSWER';
+  state.stagePickerOpen = false;
+  state.hintLevel = null;
+  state.activeChip = null;
+  if (!state.submissionResult) {
+    state.submissionResult = 'WRONG_ANSWER';
+  }
+  pushStageDivider(alreadyInWrongAnswerFlow ? '채점 결과 자동 감지: 다시 실패했어요' : '채점 결과 자동 감지: 오답이에요');
+}
+
 function handleHintLevelSelect(level) {
   if (state.busy) {
     return;
@@ -1152,6 +1171,10 @@ async function initialize() {
         });
       }
       state.languageNotSupported = nextLanguageNotSupported;
+    }
+
+    if (changes.gradingResult) {
+      applyGradingResult(changes.gradingResult.newValue);
     }
 
     renderShell();

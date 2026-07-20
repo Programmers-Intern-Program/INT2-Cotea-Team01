@@ -302,6 +302,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
   }
 
+  if (message.type === 'GRADING_RESULT') {
+    // detectedAt으로 매번 값이 바뀌게 해서, 연속으로 같은 결과(예: 오답→오답)가
+    // 나와도 storage.onChanged가 매번 발생하도록 한다.
+    setLocalState({
+      gradingResult: {
+        passed: Boolean(message.passed),
+        problemId: message.problemId ?? null,
+        detectedAt: Date.now(),
+      },
+    }).catch((error) => {
+      console.error('[Cotea] GRADING_RESULT 저장 실패:', error.message);
+    });
+  }
+
   if (message.type === 'GET_PANEL_STATE') {
     getLocalState({
       latestCode: '',
