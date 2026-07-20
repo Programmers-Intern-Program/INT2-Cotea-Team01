@@ -952,7 +952,7 @@ async function dispatchHintRequest(hintRequest, displayText) {
       timestamp: nowLabel(),
     });
   } catch (error) {
-    console.error('[Cotea] 힌트 요청 실패:', error.message);
+    console.error('[Cotea] 힌트 요청 실패:', error);
     state.messages.push({
       id: Date.now() + 2,
       role: 'ai',
