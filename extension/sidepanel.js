@@ -383,6 +383,12 @@ function renderBusyIndicator() {
 }
 
 function renderHeaderTitle() {
+  // 다른 사이트에 있을 땐 problemId/problemTitle이 storage에 남아있어도
+  // 마지막으로 봤던 문제 정보를 보여주면 안 된다 (프로그래머스를 보고 있는
+  // 것처럼 착각하게 됨).
+  if (!state.onProgrammers) {
+    return '프로그래머스 문제';
+  }
   if (state.problemTitle) {
     return `프로그래머스 문제 - ${state.problemTitle}`;
   }
@@ -1040,17 +1046,68 @@ async function handleSend() {
   await dispatchHintRequest(hintRequest, question);
 }
 
-function refreshActiveTabStatus() {
-  if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
-    return;
+function parseProblemIdFromUrl(url) {
+  if (!url) {
+    return null;
   }
+  // content.js의 parseProblemId()와 동일한 패턴 - 문제 상세 페이지인지 판별용
+  const patterns = [
+    /\/lessons\/(\d+)/,
+    /\/challenges\/(\d+)/,
+    /[?&]problem_id=(\d+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+  return null;
+}
 
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const activeTab = tabs && tabs[0];
-    const onProgrammers = Boolean(activeTab && activeTab.url && activeTab.url.includes(PROGRAMMERS_HOST));
+function isTabOnProgrammers(tab) {
+  // 도메인만 확인하면 문제 목록 페이지(코드 에디터가 없는 페이지)도 true가 되어
+  // storage에 남아있는 예전 문제 번호가 그대로 노출된다. 실제 문제 상세 페이지인
+  // 경우에만 true로 취급한다.
+  return Boolean(tab && tab.url && tab.url.includes(PROGRAMMERS_HOST) && parseProblemIdFromUrl(tab.url) != null);
+}
+
+function queryActiveTab() {
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
+      resolve(null);
+      return;
+    }
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      resolve(tabs && tabs[0] ? tabs[0] : null);
+    });
+  });
+}
+
+function refreshActiveTabStatus() {
+  queryActiveTab().then((activeTab) => {
+    const onProgrammers = isTabOnProgrammers(activeTab);
+    const urlProblemId = onProgrammers ? parseProblemIdFromUrl(activeTab.url) : null;
+    // 다른 문제로 이동한 직후엔 storage/state에 남아있던 "이전 문제" 제목이
+    // content.js의 CODE_CHANGED 감지(최대 1초 지연)가 오기 전까지 그대로 노출되던
+    // 문제를 고치기 위해, URL만으로 번호를 먼저 갱신하고 제목은 비워둔다.
+    const navigatedToDifferentProblem = onProgrammers && urlProblemId != null && urlProblemId !== state.problemId;
+
+    let shouldRender = false;
 
     if (onProgrammers !== state.onProgrammers) {
       state.onProgrammers = onProgrammers;
+      shouldRender = true;
+    }
+
+    if (navigatedToDifferentProblem) {
+      state.problemId = urlProblemId;
+      state.problemTitle = null;
+      shouldRender = true;
+      syncPageContext().then(() => renderShell());
+    }
+
+    if (shouldRender) {
       renderShell();
     }
   });
@@ -1085,11 +1142,18 @@ async function initialize() {
   }
 
   await syncPageContext();
+
+  // 패널을 연 시점에 실제로 프로그래머스 탭을 보고 있는지 먼저 확인한다.
+  // problemId/gradingResult는 다른 사이트로 넘어가도 storage에 마지막 문제
+  // 상태로 계속 남아있어서, 이 확인 없이는 웰컴 메시지/헤더에 예전 문제 번호가
+  // 그대로 뜨고 예전 채점 결과가 방금 감지된 것처럼 재생돼버린다.
+  const initialActiveTab = await queryActiveTab();
+  state.onProgrammers = isTabOnProgrammers(initialActiveTab);
+
   ensureWelcomeMessage();
-  if (pendingGradingResult) {
+  if (pendingGradingResult && state.onProgrammers) {
     applyGradingResult(pendingGradingResult);
   }
-  refreshActiveTabStatus();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
     if (chrome.tabs.onActivated) {
