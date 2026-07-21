@@ -175,6 +175,8 @@ public class RecommendationService {
         candidate.level = level;
         candidate.sourceLevel = sourceLevel;
         candidate.score = score;
+        candidate.weakTagHit = profile.weakTagCounts() != null
+                && profile.weakTagCounts().getOrDefault(primaryTag, 0L) > 0;
         return candidate;
     }
 
@@ -231,20 +233,28 @@ public class RecommendationService {
 
     private String reason(String type, Candidate c) {
         String tag = displayTag(c.primaryTag);
+        String base;
         switch (type) {
             case "SIMILAR_PATTERN":
-                return String.format(
+                base = String.format(
                         "지금 문제와 같은 %s 유형(%s)이라, 같은 접근 방식을 한 번 더 연습하기 좋아요.",
                         tag, c.matchedSubcategory);
+                break;
             case "BASIC_CONCEPT_REVIEW":
-                return String.format(
+                base = String.format(
                         "%s 개념을 더 쉬운 난이도(%s)에서 연습할 수 있는 문제예요. 부담 없이 복습한 뒤 원래 문제로 돌아오세요.",
                         tag, c.problem.getLevel());
+                break;
             default:
-                return String.format(
+                base = String.format(
                         "같은 %s 유형 문제예요. 접근 방식을 반복해서 익혀볼 수 있어요.",
                         tag);
+                break;
         }
+        if (c.weakTagHit) {
+            return base + " 최근 이 유형에서 자주 막혀서 연습용으로 추천했어요.";
+        }
+        return base;
     }
 
     private static String tagSubKey(String tag, String subcategory) {
@@ -322,6 +332,7 @@ public class RecommendationService {
         private Integer level;
         private Integer sourceLevel;
         private int score;
+        private boolean weakTagHit;
 
         private int score() {
             return score;

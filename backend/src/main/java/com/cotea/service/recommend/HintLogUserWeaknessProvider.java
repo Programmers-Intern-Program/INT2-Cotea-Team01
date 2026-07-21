@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
  * user_hint_log 기반 추천 개인화 프로필 제공.
  *
  * <p>최근 7일 힌트 로그의 problem_tags 빈도를 weakTagCounts로 반환한다.
- * solvedProblemIds는 풀이 이력 API 연동 전까지 비워 둔다.
+ * solvedProblemIds는 풀이 이력 API 연동 전까지 비운다.
+ * (힌트만 요청한 문제는 연습 후보로 남을 수 있어야 하므로 제외하지 않는다.)
  */
 @Slf4j
 @Component

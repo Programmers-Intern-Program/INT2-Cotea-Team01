@@ -29,7 +29,7 @@ class HintLogUserWeaknessProviderTest {
     }
 
     @Test
-    void 태그_집계를_weakTagCounts로_반환한다() {
+    void 태그_집계만_채우고_문제_제외_목록은_비운다() {
         when(hintLogAnalytics.countTagsForUser(1L, UserHintLogAnalytics.DEFAULT_PROFILE_DAYS))
                 .thenReturn(Map.of("bfs", 3L, "dp", 1L));
 
