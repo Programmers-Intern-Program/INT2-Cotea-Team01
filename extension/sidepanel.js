@@ -15,11 +15,21 @@ const STAGE_OPTIONS = [
 
 const STAGE_LABEL = Object.fromEntries(STAGE_OPTIONS.map((opt) => [opt.value, opt.label]));
 
+// Lucide 아이콘과 동일한 24x24 stroke 스타일로 직접 작성한 인라인 SVG.
+// (이 프로젝트엔 React/번들러가 없어 lucide-react를 쓸 수 없고, 계정/동기화
+// 버튼 아이콘과 같은 방식으로 순수 SVG 문자열을 사용한다.)
+const HINT_ICON_SVG = {
+  eye: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+  target: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>',
+  wrench: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"></path></svg>',
+  fileText: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>',
+};
+
 const HINT_LEVEL_OPTIONS = [
-  { hintLevel: 1, buttonId: 'hint_level_1', label: '1단계 관점 힌트', question: '이 문제를 어떤 관점에서 바라봐야 할지 모르겠어요' },
-  { hintLevel: 2, buttonId: 'hint_level_2', label: '2단계 접근 힌트', question: '어떤 알고리즘으로 접근해야 할지 모르겠어요' },
-  { hintLevel: 3, buttonId: 'hint_level_3', label: '3단계 구현 힌트', question: '구현 순서가 잘 안 잡혀요' },
-  { hintLevel: 4, buttonId: 'hint_level_4', label: '4단계 코드 리뷰', question: '제 코드에서 문제가 있는지 봐주세요' },
+  { hintLevel: 1, buttonId: 'hint_level_1', label: '관점 힌트', icon: HINT_ICON_SVG.eye, question: '이 문제를 어떤 관점에서 바라봐야 할지 모르겠어요' },
+  { hintLevel: 2, buttonId: 'hint_level_2', label: '접근 힌트', icon: HINT_ICON_SVG.target, question: '어떤 알고리즘으로 접근해야 할지 모르겠어요' },
+  { hintLevel: 3, buttonId: 'hint_level_3', label: '구현 힌트', icon: HINT_ICON_SVG.wrench, question: '구현 순서가 잘 안 잡혀요' },
+  { hintLevel: 4, buttonId: 'hint_level_4', label: '코드 리뷰', icon: HINT_ICON_SVG.fileText, question: '제 코드에서 문제가 있는지 봐주세요' },
 ];
 
 const SUBMISSION_RESULT_OPTIONS = [
@@ -446,7 +456,7 @@ function renderHintLevelSelector() {
     <div class="sub-select-row hint-level-grid">
       ${HINT_LEVEL_OPTIONS.map((opt) => {
         const active = state.hintLevel === opt.hintLevel;
-        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${opt.icon}<span>${escapeHtml(opt.label)}</span></button>`;
       }).join('')}
     </div>
   `;
