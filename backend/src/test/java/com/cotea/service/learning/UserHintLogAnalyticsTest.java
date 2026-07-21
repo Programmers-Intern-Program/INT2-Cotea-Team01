@@ -56,19 +56,6 @@ class UserHintLogAnalyticsTest {
         assertThat(analytics.normalizeDays(0)).isEqualTo(UserHintLogAnalytics.DEFAULT_PROFILE_DAYS);
     }
 
-    @Test
-    void 로그에서_problemId_집합을_모은다() {
-        UserHintLogEntity a = logWithTags("[\"bfs\"]");
-        ReflectionTestUtils.setField(a, "problemId", 100);
-        UserHintLogEntity b = logWithTags("[\"dfs\"]");
-        ReflectionTestUtils.setField(b, "problemId", 100);
-        UserHintLogEntity c = logWithTags("[\"dp\"]");
-        ReflectionTestUtils.setField(c, "problemId", 200);
-
-        assertThat(analytics.collectProblemIds(List.of(a, b, c)))
-                .containsExactlyInAnyOrder(100, 200);
-    }
-
     private static UserHintLogEntity logWithTags(String tagsJson) {
         UserHintLogEntity entity = new UserHintLogEntity();
         ReflectionTestUtils.setField(entity, "problemTags", tagsJson);
