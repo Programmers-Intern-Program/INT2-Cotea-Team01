@@ -180,6 +180,10 @@ class RecommendationServiceTest {
 
         assertThat(response.getRecommendations()).hasSize(2);
         assertThat(response.getRecommendations().get(0).getProblemId()).isEqualTo(100);
+        assertThat(response.getRecommendations().get(0).getReason())
+                .contains("최근 이 유형에서 자주 막혀서");
+        assertThat(response.getRecommendations().get(1).getReason())
+                .doesNotContain("최근 이 유형에서 자주 막혀서");
     }
 
     private static ProblemEntity problem(int id, String title, String level) {

@@ -5,8 +5,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +33,17 @@ public class UserHintLogAnalytics {
 
     public Map<String, Long> countTagsForUser(long userId, int days) {
         return countTags(findRecentLogs(userId, days));
+    }
+
+    /** 최근 힌트를 요청한 문제 ID 집합 (추천 제외용). */
+    public Set<Integer> collectProblemIds(List<UserHintLogEntity> logs) {
+        Set<Integer> ids = new HashSet<>();
+        for (UserHintLogEntity log : logs) {
+            if (log.getProblemId() != null) {
+                ids.add(log.getProblemId());
+            }
+        }
+        return ids;
     }
 
     public Map<String, Long> countTags(List<UserHintLogEntity> logs) {
