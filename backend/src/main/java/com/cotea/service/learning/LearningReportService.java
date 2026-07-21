@@ -4,12 +4,8 @@ import com.cotea.controller.dto.LearningReportResponse;
 import com.cotea.controller.dto.ReportCountItem;
 import com.cotea.service.auth.JwtTokenProvider;
 import com.cotea.service.learning.entity.UserHintLogEntity;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -22,18 +18,19 @@ public class LearningReportService {
     private static final int DEFAULT_LIMIT = 3;
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserHintLogRepository userHintLogRepository;
-    private final ObjectMapper objectMapper;
+    private final UserHintLogAnalytics hintLogAnalytics;
 
     public LearningReportResponse weekly(String authorization, int days) {
-        int periodDays = normalizeDays(days);
+        int periodDays = hintLogAnalytics.normalizeDays(days);
         Long userId = jwtTokenProvider.parseUserId(authorization);
-        LocalDateTime since = LocalDateTime.now().minusDays(periodDays);
-        List<UserHintLogEntity> logs = userHintLogRepository.findByUserIdAndCreatedAtAfter(userId, since);
+        List<UserHintLogEntity> logs = hintLogAnalytics.findRecentLogs(userId, periodDays);
 
-        List<ReportCountItem> topWeaknessTypes = topItems(countWeaknessTypes(logs), DEFAULT_LIMIT, this::weaknessMessage);
-        List<ReportCountItem> topIntents = topItems(countIntents(logs), DEFAULT_LIMIT, this::intentMessage);
-        List<ReportCountItem> topTags = topItems(countTags(logs), DEFAULT_LIMIT, tag -> "최근 자주 질문한 문제 유형입니다.");
+        List<ReportCountItem> topWeaknessTypes = topItems(
+                hintLogAnalytics.countWeaknessTypes(logs), DEFAULT_LIMIT, this::weaknessMessage);
+        List<ReportCountItem> topIntents = topItems(
+                hintLogAnalytics.countIntents(logs), DEFAULT_LIMIT, this::intentMessage);
+        List<ReportCountItem> topTags = topItems(
+                hintLogAnalytics.countTags(logs), DEFAULT_LIMIT, tag -> "최근 자주 질문한 문제 유형입니다.");
 
         return LearningReportResponse.builder()
                 .periodDays(periodDays)
@@ -43,55 +40,6 @@ public class LearningReportService {
                 .topTags(topTags)
                 .summary(summary(logs.size(), topWeaknessTypes, topIntents, topTags, periodDays))
                 .build();
-    }
-
-    private int normalizeDays(int days) {
-        if (days <= 0) {
-            return 7;
-        }
-        return Math.min(days, 30);
-    }
-
-    private Map<String, Long> countWeaknessTypes(List<UserHintLogEntity> logs) {
-        Map<String, Long> counts = new HashMap<>();
-        for (UserHintLogEntity log : logs) {
-            if (log.getWeaknessType() != null) {
-                counts.merge(log.getWeaknessType().name(), 1L, Long::sum);
-            }
-        }
-        return counts;
-    }
-
-    private Map<String, Long> countIntents(List<UserHintLogEntity> logs) {
-        Map<String, Long> counts = new HashMap<>();
-        for (UserHintLogEntity log : logs) {
-            if (log.getDetectedIntent() != null) {
-                counts.merge(log.getDetectedIntent().name(), 1L, Long::sum);
-            }
-        }
-        return counts;
-    }
-
-    private Map<String, Long> countTags(List<UserHintLogEntity> logs) {
-        Map<String, Long> counts = new HashMap<>();
-        for (UserHintLogEntity log : logs) {
-            for (String tag : parseTags(log.getProblemTags())) {
-                counts.merge(tag, 1L, Long::sum);
-            }
-        }
-        return counts;
-    }
-
-    private List<String> parseTags(String rawTags) {
-        if (rawTags == null || rawTags.isBlank()) {
-            return List.of();
-        }
-        try {
-            return objectMapper.readValue(rawTags, new TypeReference<List<String>>() {
-            });
-        } catch (Exception e) {
-            return List.of();
-        }
     }
 
     private List<ReportCountItem> topItems(
@@ -128,7 +76,7 @@ public class LearningReportService {
         String tag = topTags.isEmpty() ? "특정 알고리즘" : topTags.get(0).getName();
 
         return "최근 " + periodDays + "일 동안 " + weakness
-                + " 유형의 질문이 가장 많았습니다. 특히 " + tag
+                + " 유형의 질문이 가장 많습니다. 특히 " + tag
                 + " 문제에서 " + intent + " 관련 막힘이 반복되는지 점검해보면 좋습니다.";
     }
 
