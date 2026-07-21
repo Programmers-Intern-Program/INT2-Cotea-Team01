@@ -782,6 +782,14 @@ function applyGradingResult(gradingResult) {
   if (gradingResult.problemId == null || gradingResult.problemId !== state.problemId) {
     return;
   }
+  // 지금 실제로 프로그래머스 문제 페이지를 보고 있을 때만 반영한다. problemId가
+  // 우연히 일치하더라도, 패널이 다른 사이트/문제 목록 페이지를 보고 있는 동안
+  // (onProgrammers=false) 실시간 채점 결과(chrome.storage.onChanged)가 와서
+  // 상태를 바꿔버리는 걸 막기 위함. problemId 검사와 마찬가지로 호출부
+  // (초기 로딩/실시간 반영) 둘 다 이 한 곳만 거치면 되도록 여기서 검사한다.
+  if (!state.onProgrammers) {
+    return;
+  }
 
   const alreadyInWrongAnswerFlow = state.stage === 'WRONG_ANSWER';
   state.stage = 'WRONG_ANSWER';
@@ -1216,7 +1224,7 @@ async function initialize() {
   state.onProgrammers = isTabOnProgrammers(initialActiveTab);
 
   ensureWelcomeMessage();
-  if (pendingGradingResult && state.onProgrammers) {
+  if (pendingGradingResult) {
     applyGradingResult(pendingGradingResult);
   }
 
