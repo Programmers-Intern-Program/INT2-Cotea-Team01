@@ -147,6 +147,9 @@ let editorObserver = null;
 let changeDebounceTimer = null;
 let contextInvalidated = false;
 let attachObserverIntervalId = null;
+let observedGradingContainerEl = null;
+let gradingObserver = null;
+const processedGradingHeadings = new WeakSet();
 
 function isExtensionContextValid() {
   return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
@@ -161,6 +164,9 @@ function handleContextInvalidated() {
 
   if (editorObserver) {
     editorObserver.disconnect();
+  }
+  if (gradingObserver) {
+    gradingObserver.disconnect();
   }
   clearTimeout(changeDebounceTimer);
   if (attachObserverIntervalId) {
@@ -226,7 +232,113 @@ function attachEditorObserver() {
   notifyIfChanged();
 }
 
-attachObserverIntervalId = setInterval(attachEditorObserver, 1000);
+function findGradingContainer() {
+  return document.querySelector('#output') || document.querySelector('.console-content');
+}
+
+function isResultHeadingText(text) {
+  // "채점 결과"(제출 후 채점하기) / "테스트 결과"(코드 실행, 샘플 테스트케이스만 - 실제 DOM
+  // 문구는 "테스트 결과 (~˘▽˘)~") 둘 다 감지 대상. (2026-07-20 실기기 DOM 확인)
+  return text.includes('채점 결과') || text.includes('테스트 결과');
+}
+
+function getResultSource(headingText) {
+  return headingText.includes('채점 결과') ? 'submit' : 'run';
+}
+
+function parseGradingPassed(headingEl) {
+  // 콘솔 블록 텍스트 전체에서 합/불 판정 신호를 찾는다.
+  // - 제출 후 채점: "합계: X / Y"
+  // - 코드 실행(샘플 테스트케이스만): "N개 중 M개 성공"
+  // 컴파일 에러 등으로 두 신호 모두 없는 경우도 불합격으로 간주한다
+  // (TLE/런타임에러 세부 구분은 DOM 샘플 확보 전까지 1차 범위에서 제외 - report05 참고).
+  const scope = headingEl.closest('.console-content') || headingEl.parentElement;
+  if (!scope) {
+    return false;
+  }
+  const scopeText = scope.textContent || '';
+
+  const totalMatch = scopeText.match(/합계\s*[:：]\s*([\d.]+)\s*\/\s*([\d.]+)/);
+  if (totalMatch) {
+    return Number.parseFloat(totalMatch[1]) >= Number.parseFloat(totalMatch[2]);
+  }
+
+  const runMatch = scopeText.match(/(\d+)\s*개\s*중\s*(\d+)\s*개\s*성공/);
+  if (runMatch) {
+    return Number.parseInt(runMatch[1], 10) === Number.parseInt(runMatch[2], 10);
+  }
+
+  return false;
+}
+
+function checkForNewGradingResults(container) {
+  const headings = container.querySelectorAll('.console-heading');
+  headings.forEach((headingEl) => {
+    const headingText = headingEl.textContent;
+    if (!isResultHeadingText(headingText)) {
+      return;
+    }
+    if (processedGradingHeadings.has(headingEl)) {
+      return;
+    }
+    processedGradingHeadings.add(headingEl);
+
+    if (!isExtensionContextValid()) {
+      handleContextInvalidated();
+      return;
+    }
+
+    const passed = parseGradingPassed(headingEl);
+    const source = getResultSource(headingText);
+    console.log('[Cotea Content] 결과 감지:', source, passed ? '성공' : '실패');
+    try {
+      chrome.runtime.sendMessage({
+        type: 'GRADING_RESULT',
+        passed,
+        source,
+        problemId: parseProblemId(),
+      });
+    } catch (_error) {
+      handleContextInvalidated();
+    }
+  });
+}
+
+function attachGradingObserver() {
+  if (contextInvalidated) {
+    return;
+  }
+
+  const container = findGradingContainer();
+  if (!container || container === observedGradingContainerEl) {
+    return;
+  }
+
+  observedGradingContainerEl = container;
+  // 관찰 시작 시점에 이미 떠 있는 결과(예전 결과가 남아있는 새로고침 직후)는
+  // "새로운 실행/채점"이 아니므로 baseline으로만 기록하고 알리지 않는다.
+  container.querySelectorAll('.console-heading').forEach((headingEl) => {
+    if (isResultHeadingText(headingEl.textContent)) {
+      processedGradingHeadings.add(headingEl);
+    }
+  });
+
+  if (gradingObserver) {
+    gradingObserver.disconnect();
+  }
+
+  gradingObserver = new MutationObserver(() => {
+    checkForNewGradingResults(container);
+  });
+  gradingObserver.observe(container, { childList: true, subtree: true });
+
+  console.log('[Cotea Content] 채점 결과 DOM 관찰 시작');
+}
+
+attachObserverIntervalId = setInterval(() => {
+  attachEditorObserver();
+  attachGradingObserver();
+}, 1000);
 
 // background.js의 요청에 응답
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

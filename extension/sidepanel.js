@@ -787,6 +787,32 @@ function handleStageSelect(value) {
   renderShell();
 }
 
+function applyGradingResult(gradingResult) {
+  // 1차 범위: 합/불만 자동 감지하고, TLE/런타임에러 세부 구분은 하지 않은 채
+  // 모든 불합격을 기본값 오답(WRONG_ANSWER)으로 취급한다 (report05 논의 참고).
+  // 이미 사용자가 시간초과/런타임에러로 직접 고쳐놓은 값은 재감지 시에도 덮어쓰지 않는다.
+  if (!gradingResult || gradingResult.passed !== false) {
+    return;
+  }
+  // problemId가 없거나(파싱 실패) 지금 보고 있는 문제와 다르면 무시한다.
+  // 다른 탭에서 감지된 결과가 지금 패널에 잘못 반영되는 것을 막기 위함이라,
+  // 호출부(초기 로딩/실시간 반영) 둘 다 이 한 곳만 거치면 되도록 여기서 검사한다.
+  if (gradingResult.problemId == null || gradingResult.problemId !== state.problemId) {
+    return;
+  }
+
+  const alreadyInWrongAnswerFlow = state.stage === 'WRONG_ANSWER';
+  state.stage = 'WRONG_ANSWER';
+  state.stagePickerOpen = false;
+  state.hintLevel = null;
+  state.activeChip = null;
+  if (!state.submissionResult) {
+    state.submissionResult = 'WRONG_ANSWER';
+  }
+  const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
+  pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요` : `${sourceLabel} 자동 감지: 오답이에요`);
+}
+
 function handleHintLevelSelect(level) {
   if (state.busy) {
     return;
@@ -1104,6 +1130,7 @@ function refreshActiveTabStatus() {
 }
 
 async function initialize() {
+  let pendingGradingResult = null;
   try {
     const response = await sendRuntimeMessage({ type: 'GET_PANEL_STATE' });
     state.latestCode = response && response.latestCode ? response.latestCode : '';
@@ -1114,6 +1141,12 @@ async function initialize() {
     state.codeDirty = Boolean(response && response.codeDirty);
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
+
+    // 패널을 열기 전에 이미 코드 실행/채점을 해서 저장돼있던 결과가 있으면
+    // 지금 막 감지된 것처럼 반영한다. 문제 ID 일치 여부는 applyGradingResult가 검사한다.
+    if (response && response.gradingResult) {
+      pendingGradingResult = response.gradingResult;
+    }
   } catch (error) {
     console.error('[Cotea] 초기 상태 조회 실패:', error);
     state.messages.push({
@@ -1126,6 +1159,9 @@ async function initialize() {
 
   await syncPageContext();
   ensureWelcomeMessage();
+  if (pendingGradingResult) {
+    applyGradingResult(pendingGradingResult);
+  }
   refreshActiveTabStatus();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
@@ -1185,6 +1221,10 @@ async function initialize() {
         });
       }
       state.languageNotSupported = nextLanguageNotSupported;
+    }
+
+    if (changes.gradingResult) {
+      applyGradingResult(changes.gradingResult.newValue);
     }
 
     renderShell();
