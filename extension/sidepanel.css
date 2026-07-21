@@ -740,14 +740,20 @@ button {
   align-items: center;
   gap: 8px;
   margin: 0 14px;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
   background: #f1f4f9;
-  border: 1.5px solid rgba(27, 42, 74, 0.1);
+  border: 1.5px solid rgba(27, 42, 74, 0.14);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .composer-row.caret-mode {
   border-color: rgba(27, 42, 74, 0.32);
+}
+
+.composer-row:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 .composer-input-wrap {
