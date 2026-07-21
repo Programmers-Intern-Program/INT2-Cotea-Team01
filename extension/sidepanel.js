@@ -9,8 +9,8 @@ const DEFAULT_PROBLEM_ID = 1829;
 const AVATAR_URL = chrome.runtime.getURL('mascot.png');
 
 const STAGE_OPTIONS = [
-  { value: 'BEFORE_SOLVE', label: '아직 못 풀었어요', colorClass: 'stage-before-solve' },
-  { value: 'WRONG_ANSWER', label: '오답이에요', colorClass: 'stage-wrong-answer' },
+  { value: 'BEFORE_SOLVE', label: '도전', colorClass: 'stage-before-solve' },
+  { value: 'WRONG_ANSWER', label: '오답', colorClass: 'stage-wrong-answer' },
 ];
 
 const STAGE_LABEL = Object.fromEntries(STAGE_OPTIONS.map((opt) => [opt.value, opt.label]));
@@ -46,7 +46,6 @@ const state = {
   problemId: null,
   problemTitle: null,
   stage: null,
-  stagePickerOpen: true,
   hintLevel: null,
   submissionResult: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
@@ -88,16 +87,9 @@ function escapeHtml(value) {
 }
 
 function isComposerReady() {
-  if (!state.stage) {
-    return false;
-  }
-  if (state.stage === 'BEFORE_SOLVE' && !state.hintLevel) {
-    return false;
-  }
-  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
-    return false;
-  }
-  return true;
+  // 힌트 레벨/채점 결과는 세부 분류일 뿐이라, 상태(도전/오답)만 골랐으면
+  // 자유 입력을 막지 않는다. 미선택 시 기본값 처리는 handleSend에서 한다.
+  return Boolean(state.stage);
 }
 
 function pushStageDivider(label) {
@@ -424,27 +416,10 @@ function renderComposerPlaceholder() {
   if (!state.stage) {
     return '먼저 위에서 지금 상태를 선택해주세요';
   }
-  if (state.stage === 'BEFORE_SOLVE' && !state.hintLevel) {
-    return '힌트 레벨을 선택해주세요';
-  }
-  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
-    return '채점 결과를 선택해주세요';
-  }
   return 'Cotea에게 질문하세요...';
 }
 
 function renderStageSelector() {
-  if (state.stage && !state.stagePickerOpen) {
-    const opt = STAGE_OPTIONS.find((o) => o.value === state.stage);
-    return `
-      <div class="stage-select-row">
-        <button type="button" class="stage-chip current ${opt ? opt.colorClass : ''}" data-stage-change ${!state.onProgrammers || state.busy ? 'disabled' : ''}>
-          상태: ${escapeHtml(opt ? opt.label : state.stage)}<span class="stage-chip-edit">변경</span>
-        </button>
-      </div>
-    `;
-  }
-
   return `
     <div class="stage-select-row">
       ${STAGE_OPTIONS.map((opt) => {
@@ -737,17 +712,6 @@ function bindEvents() {
     });
   });
 
-  const stageChangeButton = document.querySelector('[data-stage-change]');
-  if (stageChangeButton) {
-    stageChangeButton.addEventListener('click', () => {
-      if (state.busy) {
-        return;
-      }
-      state.stagePickerOpen = true;
-      renderShell();
-    });
-  }
-
   document.querySelectorAll('[data-hint-level]').forEach((button) => {
     button.addEventListener('click', () => {
       handleHintLevelSelect(Number(button.dataset.hintLevel));
@@ -776,12 +740,9 @@ function handleStageSelect(value) {
     return;
   }
   if (state.stage === value) {
-    state.stagePickerOpen = false;
-    renderShell();
     return;
   }
   state.stage = value;
-  state.stagePickerOpen = false;
   state.hintLevel = null;
   state.submissionResult = null;
   state.activeChip = null;
@@ -806,7 +767,6 @@ function applyGradingResult(gradingResult) {
 
   const alreadyInWrongAnswerFlow = state.stage === 'WRONG_ANSWER';
   state.stage = 'WRONG_ANSWER';
-  state.stagePickerOpen = false;
   state.hintLevel = null;
   state.activeChip = null;
   if (!state.submissionResult) {

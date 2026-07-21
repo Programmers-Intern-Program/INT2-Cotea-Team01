@@ -625,27 +625,12 @@ button {
   cursor: default;
 }
 
-.stage-chip.current {
-  border-color: transparent;
-  background: #1b2a4a;
-  color: #eef2ff;
-}
-
-.stage-chip.active.stage-before-solve,
-.stage-chip.current.stage-before-solve {
+.stage-chip.active.stage-before-solve {
   background: #2563eb;
 }
 
-.stage-chip.active.stage-wrong-answer,
-.stage-chip.current.stage-wrong-answer {
+.stage-chip.active.stage-wrong-answer {
   background: #dc2626;
-}
-
-.stage-chip-edit {
-  margin-left: 6px;
-  font-size: 9px;
-  font-weight: 700;
-  opacity: 0.55;
 }
 
 .prompt-chip-row {
