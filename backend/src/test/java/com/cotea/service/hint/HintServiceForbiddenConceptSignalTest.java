@@ -6,6 +6,10 @@ import com.cotea.client.LlmClient;
 import com.cotea.config.CoteaProperties;
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.controller.dto.HintResponse;
+import com.cotea.service.auth.JwtTokenProvider;
+import com.cotea.service.learning.LearningLogService;
+import com.cotea.service.learning.UserHintLogRepository;
+import com.cotea.service.learning.WeaknessClassifier;
 import com.cotea.service.policy.PromptPolicyLoader;
 import com.cotea.service.problem.ProblemMetaMapper;
 import com.cotea.service.problem.ProblemMetaRepository;
@@ -151,7 +155,13 @@ class HintServiceForbiddenConceptSignalTest {
                 null,
                 new ConceptGapClassifier(),
                 new ConceptGapLlmSignal(),
-                new CoteaProperties()
+                new CoteaProperties(),
+                new LearningLogService(
+                        Mockito.mock(JwtTokenProvider.class),
+                        Mockito.mock(UserHintLogRepository.class),
+                        Mockito.mock(WeaknessClassifier.class),
+                        objectMapper
+                )
         );
     }
 
