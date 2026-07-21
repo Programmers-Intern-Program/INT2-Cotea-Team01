@@ -636,11 +636,6 @@ button {
   background: #2563eb;
 }
 
-.stage-chip.active.stage-solving,
-.stage-chip.current.stage-solving {
-  background: #059669;
-}
-
 .stage-chip.active.stage-wrong-answer,
 .stage-chip.current.stage-wrong-answer {
   background: #dc2626;

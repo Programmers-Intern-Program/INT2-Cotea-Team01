@@ -9,8 +9,7 @@ const DEFAULT_PROBLEM_ID = 1829;
 const AVATAR_URL = chrome.runtime.getURL('mascot.png');
 
 const STAGE_OPTIONS = [
-  { value: 'BEFORE_SOLVE', label: '풀기 전', colorClass: 'stage-before-solve' },
-  { value: 'SOLVING', label: '풀이 중', colorClass: 'stage-solving' },
+  { value: 'BEFORE_SOLVE', label: '아직 못 풀었어요', colorClass: 'stage-before-solve' },
   { value: 'WRONG_ANSWER', label: '오답이에요', colorClass: 'stage-wrong-answer' },
 ];
 
