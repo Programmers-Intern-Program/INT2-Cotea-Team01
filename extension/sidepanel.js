@@ -151,11 +151,13 @@ function ensureWelcomeMessage() {
     return;
   }
 
-  const problemLabel = state.problemId ? `문제 #${state.problemId}` : '프로그래머스 문제';
+  // 문제 번호를 언급하면, 대화 도중 실시간으로 다른 문제로 넘어가도 웰컴
+  // 메시지는 그대로 남아있어서 예전 문제 번호와 안 맞는 문구가 돼버린다.
+  // 그래서 특정 문제를 지칭하지 않는 문구로 고정한다.
   state.messages.push({
     id: Date.now(),
     role: 'ai',
-    text: `안녕하세요! 저는 Cotea예요.\n\n${problemLabel}를 함께 풀어봐요. 먼저 아래에서 지금 상태를 선택해 주세요.`,
+    text: '안녕하세요! 저는 Cotea예요.\n\n문제를 함께 풀어봐요. 먼저 아래에서 지금 상태를 선택해 주세요.\n아직 문제를 푸는 중이라면 "도전"을, 제출했지만 틀렸다면 "오답"을 눌러주세요.',
     timestamp: nowLabel(),
   });
 }
