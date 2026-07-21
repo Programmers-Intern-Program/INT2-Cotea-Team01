@@ -28,6 +28,40 @@ class HintRequestValidatorTest {
     }
 
     @Test
+    void acceptsJavaLanguageRegardlessOfCase() {
+        HintRequest request = baseRequest();
+        request.setQuestionType("BUTTON");
+        request.setButtonId("hint_level_1");
+        request.setLanguage("JAVA");
+
+        assertThatCode(() -> validator.validate(request)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsUnsupportedLanguage() {
+        HintRequest request = baseRequest();
+        request.setLanguage("Python");
+
+        assertErrorCode(request, "UNSUPPORTED_LANGUAGE");
+    }
+
+    @Test
+    void rejectsMissingLanguage() {
+        HintRequest request = baseRequest();
+        request.setLanguage(null);
+
+        assertErrorCode(request, "UNSUPPORTED_LANGUAGE");
+    }
+
+    @Test
+    void rejectsLanguageThatMerelyContainsJava() {
+        HintRequest request = baseRequest();
+        request.setLanguage("JavaScript");
+
+        assertErrorCode(request, "UNSUPPORTED_LANGUAGE");
+    }
+
+    @Test
     void rejectsInvalidHintLevel() {
         HintRequest request = baseRequest();
         request.setHintLevel(5);
@@ -127,6 +161,7 @@ class HintRequestValidatorTest {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);
         request.setStage("BEFORE_SOLVE");
+        request.setLanguage("Java");
         return request;
     }
 
