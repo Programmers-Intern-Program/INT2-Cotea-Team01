@@ -594,14 +594,15 @@ function renderShell() {
         </section>
 
         <div class="cotea-bottom-shell">
-          ${renderStageSelector()}
+          <div class="stage-row-wrap">
+            ${renderStageSelector()}
+            <div class="sync-row">
+              <span class="sync-dot ${renderSyncDotClass()}"></span>
+              <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
+            </div>
+          </div>
           ${renderHintLevelSelector()}
           ${renderSubmissionResultSelector()}
-
-          <div class="sync-row">
-            <span class="sync-dot ${renderSyncDotClass()}"></span>
-            <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
-          </div>
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">

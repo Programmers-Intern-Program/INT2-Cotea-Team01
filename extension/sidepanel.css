@@ -587,6 +587,24 @@ button {
   padding: 12px 14px 0;
 }
 
+.stage-row-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 12px 0 8px;
+}
+
+.stage-row-wrap .stage-select-row {
+  padding: 0 0 0 14px;
+}
+
+.stage-row-wrap .sync-row {
+  padding: 0 14px 0 0;
+  margin-left: auto;
+  text-align: right;
+}
+
 .sub-select-row {
   padding-top: 8px;
   padding-bottom: 10px;
