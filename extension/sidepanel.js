@@ -1047,6 +1047,13 @@ async function handleSend() {
     return;
   }
 
+  // 오답 상태에서 채점 결과를 안 골라도 자유 입력이 가능해야 하는데,
+  // 백엔드는 WRONG_ANSWER 단계에서 submissionResult를 필수로 요구한다
+  // (HintRequestValidator.validateSubmissionResult). 안 골랐으면 기본값으로 채운다.
+  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
+    state.submissionResult = 'WRONG_ANSWER';
+  }
+
   state.busy = true;
   renderShell();
   // 질문을 보내기 직전에 항상 최신 코드로 재동기화한다 (수동 동기화 버튼에만
