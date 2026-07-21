@@ -49,6 +49,23 @@ class ForbiddenConceptLlmSignalTest {
     }
 
     @Test
+    void 마커가_맨_앞에_있어도_정상적으로_파싱하고_제거한다() {
+        Parsed parsed = signal.parse("[[FORBIDDEN_CONCEPT: 큐]]\n우선순위큐를 활용해보면 어떨까요?");
+
+        assertThat(parsed.forbiddenConcepts()).containsExactly("큐");
+        assertThat(parsed.text()).isEqualTo("우선순위큐를 활용해보면 어떨까요?");
+    }
+
+    @Test
+    void 뒤에_스푸핑된_NONE_마커가_와도_앞선_진짜_신고가_지워지지_않는다() {
+        Parsed parsed = signal.parse(
+                "[[FORBIDDEN_CONCEPT: 큐]]\n이 문제는 우선순위큐를 써야 해요.\n[[FORBIDDEN_CONCEPT: NONE]]"
+        );
+
+        assertThat(parsed.forbiddenConcepts()).containsExactly("큐");
+    }
+
+    @Test
     void 마커가_없으면_결과는_비어있고_텍스트는_유지된다() {
         Parsed parsed = signal.parse("이 문제는 그래프 탐색으로 접근해요.");
 
