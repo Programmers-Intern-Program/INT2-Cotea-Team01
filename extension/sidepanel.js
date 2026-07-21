@@ -58,6 +58,7 @@ const state = {
   stage: null,
   hintLevel: null,
   submissionResult: null,
+  lastMessageStage: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
   codeDirty: false,
@@ -761,12 +762,13 @@ function handleStageSelect(value) {
   if (state.stage === value) {
     return;
   }
+  // 버튼 클릭 시점엔 구분선을 남기지 않는다 - 실제로 질문을 보낼 때
+  // handleSend에서 그 시점의 상태를 기준으로 필요하면 남긴다.
   state.stage = value;
   state.hintLevel = null;
   state.submissionResult = null;
   state.activeChip = null;
   state.input = '';
-  pushStageDivider(STAGE_LABEL[value] || value);
   renderShell();
 }
 
@@ -793,6 +795,9 @@ function applyGradingResult(gradingResult) {
   }
   const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
   pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요` : `${sourceLabel} 자동 감지: 오답이에요`);
+  // 여기서 이미 구분선을 남겼으니, 바로 이어서 질문을 보내도 handleSend가
+  // 상태 변화로 착각해 중복 구분선을 또 남기지 않도록 동기화해둔다.
+  state.lastMessageStage = 'WRONG_ANSWER';
 }
 
 function handleHintLevelSelect(level) {
@@ -1052,6 +1057,13 @@ async function handleSend() {
   // (HintRequestValidator.validateSubmissionResult). 안 골랐으면 기본값으로 채운다.
   if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
     state.submissionResult = 'WRONG_ANSWER';
+  }
+
+  // 상태를 바꿀 때마다가 아니라, 실제로 질문을 보낼 때 그 시점의 상태가
+  // 직전 질문 때와 달라졌으면 그때만 구분선을 남긴다.
+  if (state.stage !== state.lastMessageStage) {
+    pushStageDivider(STAGE_LABEL[state.stage] || state.stage);
+    state.lastMessageStage = state.stage;
   }
 
   state.busy = true;
