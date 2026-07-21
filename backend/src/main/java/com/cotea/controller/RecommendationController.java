@@ -5,6 +5,7 @@ import com.cotea.service.recommend.RecommendationService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,7 +28,9 @@ public class RecommendationController {
     public RecommendationResponse recommend(
             @RequestParam("problemId") int problemId,
             @RequestParam(value = "tags", required = false) List<String> tags,
-            @RequestParam(value = "limit", required = false) Integer limit) {
-        return recommendationService.recommend(problemId, tags, limit);
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        return recommendationService.recommend(problemId, tags, limit, authorization);
     }
 }
