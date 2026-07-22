@@ -144,7 +144,7 @@ class HintServiceForbiddenConceptSignalTest {
                 new HintLevelResolver(),
                 new ProblemContextSelector(questionResolver, objectMapper),
                 new PromptAssembler(objectMapper, questionResolver),
-                (tags, hintLevel, question) -> List.of(),
+                (tags, subcategories, hintLevel, question) -> List.of(),
                 llmClient,
                 questionResolver,
                 new HintRequestValidator(questionResolver),
@@ -172,6 +172,7 @@ class HintServiceForbiddenConceptSignalTest {
         request.setHintLevel(1);
         request.setQuestionType("BUTTON");
         request.setButtonId("hint_level_1");
+        request.setLanguage("java");
         return request;
     }
 }

@@ -78,8 +78,9 @@ public class HintService {
             String authorization
     ) {
         List<String> tags = problemContextSelector.extractTags(problem);
+        List<String> subcategories = problemContextSelector.extractSubcategories(problem);
         ObjectNode problemContext = problemContextSelector.select(problem, policy, request, hintLevel);
-        List<RagChunk> ragChunks = ragRetrievalService.retrieve(tags, hintLevel, question);
+        List<RagChunk> ragChunks = ragRetrievalService.retrieve(tags, subcategories, hintLevel, question);
 
         boolean llmSignalApplicable = conceptGapLlmSignal.isApplicable(request);
         String systemPrompt = promptAssembler.buildSystemPrompt(policy, hintLevel, request);

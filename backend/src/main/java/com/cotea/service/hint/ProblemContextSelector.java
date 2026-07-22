@@ -40,6 +40,24 @@ public class ProblemContextSelector {
         return tags;
     }
 
+    /**
+     * classification.primary[].subcategory 중 값이 있는 것만 모은다.
+     * 비어있으면(문제가 subcategory를 지정하지 않았으면) RAG 조회 쪽에서 해당 category의
+     * 모든 subcategory 문서를 그대로 포함하는 기존 동작을 유지한다(하위호환).
+     */
+    public List<String> extractSubcategories(JsonNode problem) {
+        List<String> subcategories = new ArrayList<>();
+        JsonNode primary = problem.path("classification").path("primary");
+        if (primary.isArray()) {
+            primary.forEach(item -> {
+                if (item.hasNonNull("subcategory")) {
+                    subcategories.add(item.get("subcategory").asText());
+                }
+            });
+        }
+        return subcategories;
+    }
+
     public ObjectNode select(JsonNode problem, JsonNode policy, HintRequest request, int hintLevel) {
         String stage = request.getStage();
         JsonNode levelPolicy = policy.path("hintLevelPolicy").path(String.valueOf(hintLevel));

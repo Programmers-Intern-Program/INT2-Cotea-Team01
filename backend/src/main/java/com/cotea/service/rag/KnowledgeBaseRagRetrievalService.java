@@ -30,10 +30,11 @@ public class KnowledgeBaseRagRetrievalService implements RagRetrievalService {
     private final ObjectMapper objectMapper;
 
     @Override
-    public List<RagChunk> retrieve(List<String> tags, int hintLevel, String question) {
+    public List<RagChunk> retrieve(List<String> tags, List<String> subcategories, int hintLevel, String question) {
         if (tags == null || tags.isEmpty()) {
             return List.of();
         }
+        List<String> effectiveSubcategories = subcategories == null ? List.of() : subcategories;
 
         JsonNode docs = readJsonFile(knowledgeBaseDocsPath(), objectMapper.createArrayNode());
         JsonNode fieldLevelMapping = readJsonFile(fieldLevelMappingPath(), objectMapper.createObjectNode())
@@ -43,6 +44,15 @@ public class KnowledgeBaseRagRetrievalService implements RagRetrievalService {
         for (JsonNode doc : docs) {
             String category = doc.path("category").asText(null);
             if (category == null || !tags.contains(category)) {
+                continue;
+            }
+            // 문제가 subcategory를 지정하지 않았으면(effectiveSubcategories 비어있음) 이 category의
+            // 모든 subcategory 문서를 그대로 포함한다(하위호환). 지정했다면 일치하는 subcategory
+            // 문서만 좁힌다 — "general" 자동 포함 같은 건 하지 않고, 필요하면 문제 쪽에서 명시하게 한다.
+            String docSubcategory = asNullableText(doc.path("subcategory"));
+            if (docSubcategory != null
+                    && !effectiveSubcategories.isEmpty()
+                    && !effectiveSubcategories.contains(docSubcategory)) {
                 continue;
             }
             String content = buildContent(doc, fieldLevelMapping, hintLevel);
@@ -57,6 +67,10 @@ public class KnowledgeBaseRagRetrievalService implements RagRetrievalService {
                     .build());
         }
         return chunks;
+    }
+
+    private String asNullableText(JsonNode node) {
+        return (node.isMissingNode() || node.isNull()) ? null : node.asText();
     }
 
     private String buildContent(JsonNode doc, JsonNode fieldLevelMapping, int hintLevel) {

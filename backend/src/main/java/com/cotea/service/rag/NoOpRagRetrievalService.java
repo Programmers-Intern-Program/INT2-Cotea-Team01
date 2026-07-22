@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 public class NoOpRagRetrievalService implements RagRetrievalService {
 
     @Override
-    public List<RagChunk> retrieve(List<String> tags, int hintLevel, String question) {
+    public List<RagChunk> retrieve(List<String> tags, List<String> subcategories, int hintLevel, String question) {
         return Collections.emptyList();
     }
 }
