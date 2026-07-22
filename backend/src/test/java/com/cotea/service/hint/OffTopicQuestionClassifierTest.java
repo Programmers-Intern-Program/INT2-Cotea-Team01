@@ -55,11 +55,17 @@ class OffTopicQuestionClassifierTest {
     }
 
     @Test
-    void unrelatedChatIsOffTopic() {
+    void unrelatedChatKeywordsAreAmbiguousNotHardOffTopic() {
         HintRequest request = freeTextRequest();
 
         assertThat(classifier.classify(request, "오늘 점심 뭐 먹지?"))
-                .isEqualTo(Verdict.OFF_TOPIC);
+                .isEqualTo(Verdict.AMBIGUOUS);
+        assertThat(classifier.classify(request, "오늘 주식 어때?", "카카오프렌즈 컬러링북"))
+                .isEqualTo(Verdict.AMBIGUOUS);
+        assertThat(classifier.classify(request, "날씨에 따라 의상을 고르는 로직이 맞나요?", "단체 사진"))
+                .isEqualTo(Verdict.AMBIGUOUS);
+        assertThat(classifier.classify(request, "고백 그래프에서 연결 성분을 어떻게 구하나요?", "친구 네트워크"))
+                .isEqualTo(Verdict.AMBIGUOUS);
     }
 
     @Test
@@ -71,26 +77,6 @@ class OffTopicQuestionClassifierTest {
                 "주식 가격 계산 결과가 맞게 나오는지 한번만 봐주실 수 있나요?",
                 "주식가격"))
                 .isEqualTo(Verdict.AMBIGUOUS);
-    }
-
-    @Test
-    void stockKeywordWithUserCodeIsAmbiguous() {
-        HintRequest request = freeTextRequest();
-        request.setUserCode("class Solution { public int[] solution(int[] prices) { return prices; } }");
-
-        assertThat(classifier.classify(
-                request,
-                "주식 가격 계산 결과가 맞게 나오는지 한번만 봐주실 수 있나요?",
-                "카카오프렌즈 컬러링북"))
-                .isEqualTo(Verdict.AMBIGUOUS);
-    }
-
-    @Test
-    void stockKeywordWithoutContextIsOffTopic() {
-        HintRequest request = freeTextRequest();
-
-        assertThat(classifier.classify(request, "오늘 주식 어때?", "카카오프렌즈 컬러링북"))
-                .isEqualTo(Verdict.OFF_TOPIC);
     }
 
     @Test

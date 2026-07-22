@@ -7,14 +7,14 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
- * 전처리(문제 메타) 기반 힌트 경로 vs 범위 밖 FREE_TEXT 경로를 규칙으로 판별한다.
+ * FREE_TEXT 라우팅을 규칙으로 1차 판별한다.
  *
- * <p>BUTTON은 항상 RELATED. FREE_TEXT는 명확한 UNRELATED/RELATED만 규칙으로 확정하고,
- * 키워드에 안 걸리는 짧은 질문은 {@link Verdict#AMBIGUOUS}로 남겨 LLM 라우터에 넘긴다.
+ * <p>BUTTON·빈 질문 → {@link Verdict#RELATED}.
+ * RELATED 키워드/짧은 알고리즘 용어 → {@link Verdict#RELATED}.
+ * 그 외(잡담·소재성 키워드·짧은 애매 질문 포함) → 전부 {@link Verdict#AMBIGUOUS}.
  *
- * <p>UNRELATED 키워드가 있어도 문제 제목과 겹치거나 userCode가 있으면
- * 하드 OFF_TOPIC이 아니라 {@link Verdict#AMBIGUOUS}로 올린다
- * (예: 주식가격 문제에서 "주식"이 자연스럽게 등장하는 경우).
+ * <p>연애/날씨/주식 등은 스토리형 문제에도 자주 등장하므로 규칙 단계 하드 OFF_TOPIC은 두지 않는다.
+ * OFF_TOPIC 확정은 {@link OffTopicRouteLlmClassifier}가 담당한다.
  */
 @Component
 public class OffTopicQuestionClassifier {
@@ -36,22 +36,13 @@ public class OffTopicQuestionClassifier {
     // RELATED 정규식의 단순 포함 검사 대신 조사 경계까지 확인하는 별도 목록으로 뺐다.
     private static final List<String> RELATED_SHORT_TERMS = List.of("dfs", "bfs", "dp", "큐", "스택");
 
-    private static final Pattern UNRELATED = Pattern.compile(
-            ".*(점심|저녁|날씨|게임\\s*추천|영화|노래|연예|주식|비트코인|"
-                    + "사랑|연애|오늘\\s*뭐\\s*해|심심해|농담).*",
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    );
-
-    /** 문제 제목 겹침 검사용 — UNRELATED 도메인 단어(잡담 vs 문제 소재). */
-    private static final List<String> UNRELATED_DOMAIN_TERMS = List.of(
-            "점심", "저녁", "날씨", "영화", "노래", "연예", "주식", "비트코인",
-            "사랑", "연애", "심심해", "농담", "게임"
-    );
-
     public Verdict classify(HintRequest request, String question) {
         return classify(request, question, null);
     }
 
+    /**
+     * @param problemTitle 규칙 판별에는 쓰지 않음. LLM 라우터 호출 측에서 맥락으로 사용.
+     */
     public Verdict classify(HintRequest request, String question, String problemTitle) {
         if (!"FREE_TEXT".equals(request.getQuestionType())) {
             return Verdict.RELATED;
@@ -59,12 +50,6 @@ public class OffTopicQuestionClassifier {
         String q = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (q.isEmpty()) {
             return Verdict.RELATED;
-        }
-        if (UNRELATED.matcher(q).matches()) {
-            if (hasProblemContext(request, q, problemTitle)) {
-                return Verdict.AMBIGUOUS;
-            }
-            return Verdict.OFF_TOPIC;
         }
         if (RELATED.matcher(q).matches()) {
             return Verdict.RELATED;
@@ -75,26 +60,5 @@ public class OffTopicQuestionClassifier {
             return Verdict.RELATED;
         }
         return Verdict.AMBIGUOUS;
-    }
-
-    /**
-     * UNRELATED 키워드가 문제 맥락일 수 있는지.
-     * - userCode가 있으면 풀이 중으로 본다.
-     * - 질문·문제 제목에 같은 도메인 단어가 있으면 문제 소재로 본다.
-     */
-    private boolean hasProblemContext(HintRequest request, String questionLower, String problemTitle) {
-        if (request.getUserCode() != null && !request.getUserCode().isBlank()) {
-            return true;
-        }
-        if (problemTitle == null || problemTitle.isBlank()) {
-            return false;
-        }
-        String title = problemTitle.toLowerCase(Locale.ROOT);
-        for (String term : UNRELATED_DOMAIN_TERMS) {
-            if (questionLower.contains(term) && title.contains(term)) {
-                return true;
-            }
-        }
-        return false;
     }
 }
