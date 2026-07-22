@@ -58,6 +58,7 @@ const state = {
   stage: null,
   hintLevel: null,
   submissionResult: null,
+  submissionResultAutoDetected: false,
   lastMessageStage: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
@@ -764,15 +765,17 @@ function handleStageSelect(value) {
   state.stage = value;
   state.hintLevel = null;
   state.submissionResult = null;
+  state.submissionResultAutoDetected = false;
   state.activeChip = null;
   state.input = '';
   renderShell();
 }
 
+const AUTO_DETECTABLE_SUBMISSION_RESULTS = new Set(['WRONG_ANSWER', 'TIME_LIMIT_EXCEEDED', 'RUNTIME_ERROR']);
+
 function applyGradingResult(gradingResult) {
-  // 1차 범위: 합/불만 자동 감지하고, TLE/런타임에러 세부 구분은 하지 않은 채
-  // 모든 불합격을 기본값 오답(WRONG_ANSWER)으로 취급한다 (report05 논의 참고).
-  // 이미 사용자가 시간초과/런타임에러로 직접 고쳐놓은 값은 재감지 시에도 덮어쓰지 않는다.
+  // 실패 시 오답/시간초과/런타임에러를 자동 판별해 submissionResult를 채운다.
+  // 이미 사용자가 직접 고쳐놓은 값은 재감지 시에도 덮어쓰지 않는다.
   if (!gradingResult || gradingResult.passed !== false) {
     return;
   }
@@ -795,11 +798,16 @@ function applyGradingResult(gradingResult) {
   state.stage = 'WRONG_ANSWER';
   state.hintLevel = null;
   state.activeChip = null;
-  if (!state.submissionResult) {
-    state.submissionResult = 'WRONG_ANSWER';
+  // 이전 값이 없거나, 이전 값도 (사용자가 아니라) 자동 감지로 채워진 것이었다면
+  // 최신 감지 결과로 갱신한다. 사용자가 직접 고른 값만 보존 대상이다.
+  if (!state.submissionResult || state.submissionResultAutoDetected) {
+    const detected = gradingResult.failureReason;
+    state.submissionResult = AUTO_DETECTABLE_SUBMISSION_RESULTS.has(detected) ? detected : 'WRONG_ANSWER';
+    state.submissionResultAutoDetected = true;
   }
   const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
-  pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요` : `${sourceLabel} 자동 감지: 오답이에요`);
+  const resultLabel = SUBMISSION_RESULT_OPTIONS.find((o) => o.value === state.submissionResult)?.label ?? '오답';
+  pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요 (${resultLabel})` : `${sourceLabel} 자동 감지: ${resultLabel}`);
   // 여기서 이미 구분선을 남겼으니, 바로 이어서 질문을 보내도 handleSend가
   // 상태 변화로 착각해 중복 구분선을 또 남기지 않도록 동기화해둔다.
   state.lastMessageStage = 'WRONG_ANSWER';
@@ -832,6 +840,7 @@ function handleSubmissionResultSelect(value) {
     return;
   }
   state.submissionResult = value;
+  state.submissionResultAutoDetected = false;
   state.input = opt.whyQuestion;
   state.activeChip = opt.whyLabel;
   renderShell();

@@ -149,7 +149,12 @@ let contextInvalidated = false;
 let attachObserverIntervalId = null;
 let observedGradingContainerEl = null;
 let gradingObserver = null;
-const processedGradingHeadings = new WeakSet();
+// 헤딩 엘리먼트별로 "마지막으로 처리한 콘솔 텍스트"를 저장한다. 단순 WeakSet(엘리먼트
+// 자체만 기억)이었을 때는, 프로그래머스가 같은 결과 영역 DOM 엘리먼트를 재사용해
+// textContent만 갱신하는 경우(연속으로 "제출 후 채점하기"만 눌렀을 때) 최초 1회 이후
+// 새 결과가 와도 "이미 처리한 엘리먼트"로 착각해 다시는 감지하지 못했다.
+// (2026-07-22: 런타임에러 감지 후 같은 문제를 시간초과로 다시 채점해도 안 잡히는 버그로 확인)
+const processedGradingHeadings = new WeakMap();
 
 function isExtensionContextValid() {
   return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
@@ -246,18 +251,16 @@ function getResultSource(headingText) {
   return headingText.includes('채점 결과') ? 'submit' : 'run';
 }
 
-function parseGradingPassed(headingEl) {
+function getGradingScopeText(headingEl) {
+  const scope = headingEl.closest('.console-content') || headingEl.parentElement;
+  return scope ? scope.textContent || '' : '';
+}
+
+function parseGradingPassed(scopeText) {
   // 콘솔 블록 텍스트 전체에서 합/불 판정 신호를 찾는다.
   // - 제출 후 채점: "합계: X / Y"
   // - 코드 실행(샘플 테스트케이스만): "N개 중 M개 성공"
-  // 컴파일 에러 등으로 두 신호 모두 없는 경우도 불합격으로 간주한다
-  // (TLE/런타임에러 세부 구분은 DOM 샘플 확보 전까지 1차 범위에서 제외 - report05 참고).
-  const scope = headingEl.closest('.console-content') || headingEl.parentElement;
-  if (!scope) {
-    return false;
-  }
-  const scopeText = scope.textContent || '';
-
+  // 컴파일 에러 등으로 두 신호 모두 없는 경우도 불합격으로 간주한다.
   const totalMatch = scopeText.match(/합계\s*[:：]\s*([\d.]+)\s*\/\s*([\d.]+)/);
   if (totalMatch) {
     return Number.parseFloat(totalMatch[1]) >= Number.parseFloat(totalMatch[2]);
@@ -271,6 +274,21 @@ function parseGradingPassed(headingEl) {
   return false;
 }
 
+function parseFailureReason(scopeText) {
+  // 채점/실행 요약("합계: X / Y")은 오답·시간초과·런타임에러 모두 동일한 포맷이라
+  // 실패 사유를 구분하지 못한다. 개별 테스트케이스 행의 "실패 (시간 초과)" /
+  // "실패 (런타임 에러)" 문구로만 구분 가능 (2026-07-22 실기기 DOM 확인).
+  // \s는 일반 스페이스뿐 아니라 줄바꿈 방지용 non-breaking space( )도 매칭하므로
+  // 괄호 안 공백 문자 종류에 상관없이 안전하게 잡는다.
+  if (/시간\s*초과/.test(scopeText)) {
+    return 'TIME_LIMIT_EXCEEDED';
+  }
+  if (/런타임\s*에러/.test(scopeText)) {
+    return 'RUNTIME_ERROR';
+  }
+  return 'WRONG_ANSWER';
+}
+
 function checkForNewGradingResults(container) {
   const headings = container.querySelectorAll('.console-heading');
   headings.forEach((headingEl) => {
@@ -278,23 +296,26 @@ function checkForNewGradingResults(container) {
     if (!isResultHeadingText(headingText)) {
       return;
     }
-    if (processedGradingHeadings.has(headingEl)) {
+    const scopeText = getGradingScopeText(headingEl);
+    if (processedGradingHeadings.get(headingEl) === scopeText) {
       return;
     }
-    processedGradingHeadings.add(headingEl);
+    processedGradingHeadings.set(headingEl, scopeText);
 
     if (!isExtensionContextValid()) {
       handleContextInvalidated();
       return;
     }
 
-    const passed = parseGradingPassed(headingEl);
+    const passed = parseGradingPassed(scopeText);
+    const failureReason = passed ? null : parseFailureReason(scopeText);
     const source = getResultSource(headingText);
-    console.log('[Cotea Content] 결과 감지:', source, passed ? '성공' : '실패');
+    console.log('[Cotea Content] 결과 감지:', source, passed ? '성공' : `실패 (${failureReason})`);
     try {
       chrome.runtime.sendMessage({
         type: 'GRADING_RESULT',
         passed,
+        failureReason,
         source,
         problemId: parseProblemId(),
       });
@@ -319,7 +340,7 @@ function attachGradingObserver() {
   // "새로운 실행/채점"이 아니므로 baseline으로만 기록하고 알리지 않는다.
   container.querySelectorAll('.console-heading').forEach((headingEl) => {
     if (isResultHeadingText(headingEl.textContent)) {
-      processedGradingHeadings.add(headingEl);
+      processedGradingHeadings.set(headingEl, getGradingScopeText(headingEl));
     }
   });
 

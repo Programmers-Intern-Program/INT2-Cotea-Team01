@@ -326,6 +326,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     setLocalState({
       gradingResult: {
         passed: Boolean(message.passed),
+        failureReason: message.failureReason ?? null,
         source: message.source === 'run' ? 'run' : 'submit',
         problemId: message.problemId ?? null,
         detectedAt: Date.now(),
