@@ -1238,6 +1238,13 @@ function refreshActiveTabStatus() {
 
     if (onProgrammers !== state.onProgrammers) {
       state.onProgrammers = onProgrammers;
+      // 확인 대기 중에 프로그래머스를 완전히 벗어나면, renderShell()이 onProgrammers
+      // 여부와 무관하게 pendingProblemSwitch를 최우선으로 그려버려서 오프사이트
+      // 안내/비활성화 화면 대신 엉뚱하게 확인 카드가 계속 떠 있게 된다. 물어볼
+      // 대상 페이지 자체를 벗어났으니 조용히 취소한다.
+      if (!onProgrammers && state.pendingProblemSwitch) {
+        state.pendingProblemSwitch = null;
+      }
       shouldRender = true;
     }
 
