@@ -471,8 +471,8 @@
         "signal": "규칙이나 공식을 찾기 어렵고 입력 범위가 작다면, math보다 bruteforcing으로 전체를 확인하는 편이 더 단순할 수 있다."
       },
       {
-        "ref": "dp",
-        "signal": "경우의 수를 구하되 부분 문제의 답을 저장해 재활용해야 한다면, math보다 dp가 더 구체적인 접근일 수 있다."
+        "ref": "dp_general",
+        "signal": "경우의 수를 구하되 부분 문제의 답을 저장해 재활용해야 한다면, math보다 dp_general이 더 구체적인 접근일 수 있다."
       }
     ],
     "code_signals": {

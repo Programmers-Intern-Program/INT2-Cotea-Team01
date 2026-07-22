@@ -19,7 +19,7 @@
   "applicable_scale": "완전탐색으로 처리 가능한 규모인지(예: N이 10^6 이하)를 먼저 판단하고, 그 이상이면 O(log N)이나 O(sqrt(N)) 수준의 수학적 공식·알고리즘(소수 판별, 거듭제곱 등)이 필요한지 확인해야 한다.",
   "distinguishing_from": [
     { "ref": "bruteforcing", "signal": "규칙이나 공식을 찾기 어렵고 입력 범위가 작다면, math보다 bruteforcing으로 전체를 확인하는 편이 더 단순할 수 있다." },
-    { "ref": "dp", "signal": "경우의 수를 구하되 부분 문제의 답을 저장해 재활용해야 한다면, math보다 dp가 더 구체적인 접근일 수 있다." }
+    { "ref": "dp_general", "signal": "경우의 수를 구하되 부분 문제의 답을 저장해 재활용해야 한다면, math보다 dp_general이 더 구체적인 접근일 수 있다." }
   ],
   "often_combined_with": [
     { "ref": "bruteforcing", "note": "수학적 규칙을 못 찾았을 때 대안으로 완전탐색이 함께 언급되는 경우가 많다." },
