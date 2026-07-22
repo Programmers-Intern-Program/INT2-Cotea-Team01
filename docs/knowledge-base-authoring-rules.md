@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | `doc_id` | ✅ | ❌ (빌드 시 드롭) | — | **완전 미사용.** `RagChunk.chunkId`는 `doc_id`가 아니라 `category` 문자열을 그대로 씀 |
 | `category` | ✅ | ✅ | ✅ (매칭 키) | 살아있음 — 문제의 `classification.primary[].tag`와 정확히 일치해야 매칭 |
-| `subcategory` | ✅ | ✅ | ❌ | **빌드엔 남지만 필터링에 전혀 안 쓰임** (§3 참고) |
+| `subcategory` | ✅ | ✅ | ✅ (2026-07-23 이후) | 살아있음 — 문제가 subcategory를 지정하면 일치하는 문서만 좁혀서 매칭 (§3 참고) |
 | `hint_level_scope` | ✅ | ❌ (빌드 시 드롭) | — | **완전 미사용.** 레벨 게이팅은 이 필드가 아니라 `field_level_mapping.json`이 필드 단위로 함 |
 | `language` | ✅ | ✅ | ❌ (매칭·콘텐츠 조립 어디에도 안 쓰임) | 메타데이터로만 남아있음 |
 | `content.definition` | ✅ | ✅ (flatten) | ✅ | 살아있음 — `field_level_mapping.json`의 `related_levels: [2]` |
@@ -25,18 +25,20 @@
 | `code_signals` | ✅ (선택) | ✅ (있으면) | ❌ | 위와 동일 |
 | `often_combined_with` | ✅ (선택) | ✅ (있으면) | ❌ | 위와 동일 |
 
-## 3. `subcategory`는 매칭에 안 쓰인다 — README의 "1:1 매칭" 설명은 부정확하다
+## 3. `subcategory` 매칭 — 2026-07-23 구현 완료
 
-`KnowledgeBaseRagRetrievalService.retrieve()`의 매칭 로직은 다음이 전부다:
+> **2026-07-23 완료**: 아래는 원래 "subcategory가 매칭에 전혀 안 쓰인다"는 버그를 기록한 절이었다. `ProblemContextSelector.extractSubcategories()` 추가, `RagRetrievalService.retrieve()`에 `subcategories` 파라미터 추가, `KnowledgeBaseRagRetrievalService`의 매칭 로직 확장으로 이제 실제로 필터링에 쓰인다. 아래 원인 설명은 "왜 이 필드가 필요했는지" 배경으로 남겨두고, 결론만 현재 동작으로 갱신한다.
+
+수정 전 `KnowledgeBaseRagRetrievalService.retrieve()`의 매칭 로직은 category만 봤다:
 
 ```java
 String category = doc.path("category").asText(null);
 if (category == null || !tags.contains(category)) continue;
 ```
 
-`subcategory`는 아예 참조되지 않는다. `rag/README.md`는 "카테고리당 문서가 사실상 1:1이라, 태그가 정해지면 어떤 문서를 쓸지도 사실상 정해진다"고 적어뒀지만, 이건 subcategory가 **없는** 20개 카테고리 중 12개에만 맞는 말이다. subcategory가 있는 8개 카테고리(`dp`, `hash_set`, `greedy`, `simulation`, `trees`, `graph_traversal`, `array`, `string`)는 문서가 카테고리당 2~4개씩 있는데(예: `dp` → dp_general/dp_knapsack/dp_path_counting/dp_subsequence 4개), 문제가 `tag: "dp"`로만 분류되면 **이 4개 문서가 전부 매칭돼서 한꺼번에 프롬프트에 들어간다.** 게다가 `ProblemContextSelector.extractTags()`도 `tag`만 뽑고 `subcategory`는 아예 안 읽어서, 애초에 문제 쪽에서 "dp_knapsack만 써라"라고 지정할 방법도 없다.
+`subcategory`가 있는 카테고리(`dp`, `hash_set`, `greedy`, `simulation`, `trees`, `graph_traversal`, `array`, `string` 등)는 카테고리당 문서가 2~4개씩 있어서(예: `dp` → dp_general/dp_knapsack/dp_path_counting/dp_subsequence), 문제가 `tag: "dp"`로만 분류되면 이 문서들이 전부 매칭돼 한꺼번에 프롬프트에 들어갔다. `rag/README.md`의 "카테고리당 문서가 사실상 1:1" 서술도 이 문제를 근거로 부정확하다고 지적했었다.
 
-**결론**: 지금 시스템에서 subcategory는 사람이 문서를 정리하는 용도(가독성)로만 의미가 있고, 실제 검색 정밀도에는 기여하지 않는다. `math`에 subcategory를 나누더라도, 그 하위 카테고리들은 항상 다 같이 매칭된다고 가정하고 내용을 써야 한다 — "이 하위 카테고리일 때만 이 내용이 보인다"는 전제로 글을 쓰면 안 된다.
+**현재 동작**: 문제가 `classification.primary[].subcategory`를 지정하지 않으면(빈 값) 해당 category의 모든 subcategory 문서가 그대로 매칭된다(하위호환). 지정하면 일치하는 subcategory 문서만 좁혀서 매칭된다 — "general" 문서를 자동으로 끼워 넣는 로직은 없고, 필요하면 문제 쪽에서 명시적으로 지정해야 한다. `rag/README.md`의 "1:1 매칭" 서술도 이 동작을 반영해 갱신했다.
 
 ## 4. `distinguishing_from` / `code_signals` / `often_combined_with`는 LLM이 못 본다
 
@@ -51,7 +53,7 @@ if (category == null || !tags.contains(category)) continue;
 1. **`category: "math"`** — `classification.primary[].tag`와 정확히 일치해야 매칭된다. `docs/erd.md`가 21개(그중 하나가 math)라고 적어둔 것과 맞추려면, 문제 데이터 쪽에서도 `math`를 tag로 쓰기 전에 이 문서부터 존재해야 한다(순서: knowledge_base 문서 → 문제 데이터에서 tag 사용).
 2. **`content.definition` / `when_to_use` / `java_specific_notes`** — 실제로 프롬프트에 실리는 핵심 3필드. Lv2(definition), Lv2~3(when_to_use), Lv3~4(java_specific_notes) 노출 기준에 맞게, "알고리즘 이름을 몰라도 이해되는 정의(definition) → 언제 쓰는지(when_to_use) → 자바 구현 시 흔한 실수(java_specific_notes)" 순서로 난이도가 올라가게 쓴다. (`bfs.json`/`dp_general.json`/`stack.json` 3건 모두 이 패턴을 따르고 있어 그대로 참고하면 된다.)
 3. **`applicable_scale`** — "이 접근이 통하는/안 통하는 입력 규모" 기준. math는 다른 카테고리와 달리 "입력 규모"보다 "정수 오버플로우, 부동소수점 오차, 나눗셈 나머지 처리" 같은 수치적 한계가 더 중요할 수 있다 — 이 필드의 의미를 그대로 가져오되, math 특성에 맞게 재해석해서 쓸 것.
-4. **`subcategory`** — 나눠도 되지만 §3의 한계(필터링 안 됨)를 인지하고, 하위 카테고리 없이 문서 하나로 시작하는 것도 고려할 만하다. 프로그래머스 수학 문제가 실제로 몇 개 있고 얼마나 갈래가 나뉘는지부터 먼저 조사하는 게 순서상 맞다.
+4. **`subcategory`** — 이제 §3에 따라 실제로 필터링에 쓰이니, 나눌 경우 문제 데이터 쪽에서 해당 subcategory를 명시해야 그 문서만 좁혀서 매칭된다는 점을 감안해서 설계할 것. `math.json`은 프로그래머스 수학 문제 분포 조사 전이라 우선 `null`(단일 문서)로 시작했고, 필요해지면 재검토한다.
 5. **`doc_id`, `hint_level_scope`** — 완전 미사용이라 채워도 기능에 영향 없다. 다만 스키마 일관성(다른 29개 문서와 형태 통일)을 위해 관례대로 채워두는 걸 권장한다 (`doc_id`는 `category`와 동일하게, `hint_level_scope`는 `[2, 3]` 같은 기존 문서들의 패턴을 따름).
 6. **`distinguishing_from` / `code_signals` / `often_combined_with`** — §4에 따라 지금은 기능적으로 죽어있는 필드. 시간 여유가 있을 때만.
 
@@ -73,5 +75,5 @@ if (category == null || !tags.contains(category)) continue;
 
 ## 7. 이번 조사에서 함께 드러난, 이 문서 범위를 벗어나는 별도 이슈
 
-- `subcategory` 필터링 미구현(§3)과 `distinguishing_from`/`code_signals`/`often_combined_with` 미소비(§4)는 `math` 작성 규칙과는 별개로, **RAG 검색 품질 자체의 개선 여지**다. 코드 변경이 필요한 사안이라 이 규칙 문서 범위 밖으로 남겨둔다.
-- `docs/vector-db-schema.md`와 `rag/README.md`가 실제 구현과 부분적으로 어긋나 있다(예: "1:1 매칭" 서술). math 작업과 무관하게 문서 갱신이 필요하다.
+- `subcategory` 필터링은 2026-07-23에 구현 완료됐다(§3). `distinguishing_from`/`code_signals`/`often_combined_with` 미소비(§4)는 여전히 남아있는 별개 이슈로, `math` 작성 규칙과 무관하게 **RAG 검색 품질 자체의 개선 여지**다. 코드 변경이 필요한 사안이라 이 규칙 문서 범위 밖으로 남겨둔다.
+- `docs/vector-db-schema.md`가 통제 어휘 개수(20→21) 외에 실제 구현과 어긋나는 부분이 더 있는지는 아직 별도로 점검하지 않았다.
