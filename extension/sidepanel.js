@@ -60,6 +60,9 @@ const state = {
   submissionResult: null,
   submissionResultAutoDetected: false,
   lastMessageStage: null,
+  // 대화가 진행 중인 상태에서 다른 문제로 이동한 걸 감지했을 때, 사용자가
+  // "이전 대화 유지"/"새로 시작"을 고르기 전까지 여기에 새 문제 id를 잠깐 들고 있는다.
+  pendingProblemSwitch: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
   codeDirty: false,
@@ -536,6 +539,22 @@ function renderLoginFormView() {
   `;
 }
 
+function renderProblemSwitchView() {
+  const newProblemId = state.pendingProblemSwitch.problemId;
+  return `
+    <section class="login-view">
+      <div class="login-card">
+        <p class="login-title">다른 문제로 이동했어요</p>
+        <p class="login-desc">문제 #${escapeHtml(String(newProblemId))}(으)로 이동한 것 같아요. 지금까지의 대화를 이어서 쓸까요, 새로 시작할까요?</p>
+        <div class="problem-switch-actions">
+          <button type="button" id="problem-switch-keep" class="problem-switch-button keep">이전 대화 유지</button>
+          <button type="button" id="problem-switch-reset" class="problem-switch-button reset">새로 시작</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderLoginView() {
   // loginSuccess는 "방금 로그인 성공" 전환 구간 — 이 동안은 로그인됐어도 웰컴 문구가 있는
   // 로그인 카드를 유지하고, 구간이 끝나면(auto-close) 다음에 열 때부터 프로필 카드로 전환된다.
@@ -579,7 +598,7 @@ function renderShell() {
             <button type="button" id="account-button" class="header-action account-button ${state.showLogin ? 'active' : ''}" aria-label="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}" data-tooltip="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}">
               ${renderAccountButtonInner()}
             </button>
-            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers ? 'disabled' : ''}>
+            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers || state.pendingProblemSwitch ? 'disabled' : ''}>
               <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>
@@ -589,7 +608,7 @@ function renderShell() {
           </div>
         </header>
 
-        ${state.showLogin ? renderLoginView() : `
+        ${state.showLogin ? renderLoginView() : state.pendingProblemSwitch ? renderProblemSwitchView() : `
         <section class="cotea-chat-scroll" id="chat-scroll">
           ${state.messages.map(renderMessage).join('')}
           ${renderBusyIndicator()}
@@ -671,6 +690,16 @@ function bindEvents() {
   const kakaoLoginButton = document.getElementById('kakao-login-button');
   if (kakaoLoginButton) {
     kakaoLoginButton.addEventListener('click', handleKakaoLogin);
+  }
+
+  const problemSwitchKeepButton = document.getElementById('problem-switch-keep');
+  if (problemSwitchKeepButton) {
+    problemSwitchKeepButton.addEventListener('click', handleKeepConversationOnProblemSwitch);
+  }
+
+  const problemSwitchResetButton = document.getElementById('problem-switch-reset');
+  if (problemSwitchResetButton) {
+    problemSwitchResetButton.addEventListener('click', handleStartFreshOnProblemSwitch);
   }
 
   const reportButton = document.getElementById('report-button');
@@ -933,7 +962,7 @@ function formatWeeklyReport(report) {
 }
 
 async function handleSync() {
-  if (state.syncing || !state.onProgrammers) {
+  if (state.syncing || !state.onProgrammers || state.pendingProblemSwitch) {
     return;
   }
 
@@ -1166,27 +1195,81 @@ function queryActiveTab() {
   });
 }
 
+function hasActiveConversation() {
+  // 웰컴 메시지 하나만 있는 상태는 "아직 진행 중인 대화"로 치지 않는다 -
+  // 사용자가 실제로 입력을 하거나 상태를 고른 적이 있어야 잃을 게 있는 것.
+  return state.stage != null || state.messages.some((message) => message.role === 'user');
+}
+
+function applyProblemSwitch(newProblemId, resetConversation) {
+  state.problemId = newProblemId;
+  state.problemTitle = null;
+  state.pendingProblemSwitch = null;
+  if (resetConversation) {
+    state.messages = [];
+    state.stage = null;
+    state.hintLevel = null;
+    state.submissionResult = null;
+    state.activeChip = null;
+    state.input = '';
+    state.lastMessageStage = null;
+    ensureWelcomeMessage();
+  }
+  renderShell();
+  syncPageContext().then(() => renderShell());
+}
+
+function handleKeepConversationOnProblemSwitch() {
+  if (!state.pendingProblemSwitch) {
+    return;
+  }
+  applyProblemSwitch(state.pendingProblemSwitch.problemId, false);
+}
+
+function handleStartFreshOnProblemSwitch() {
+  if (!state.pendingProblemSwitch) {
+    return;
+  }
+  applyProblemSwitch(state.pendingProblemSwitch.problemId, true);
+}
+
 function refreshActiveTabStatus() {
   queryActiveTab().then((activeTab) => {
     const onProgrammers = isTabOnProgrammers(activeTab);
     const urlProblemId = onProgrammers ? parseProblemIdFromUrl(activeTab.url) : null;
-    // 다른 문제로 이동한 직후엔 storage/state에 남아있던 "이전 문제" 제목이
-    // content.js의 CODE_CHANGED 감지(최대 1초 지연)가 오기 전까지 그대로 노출되던
-    // 문제를 고치기 위해, URL만으로 번호를 먼저 갱신하고 제목은 비워둔다.
-    const navigatedToDifferentProblem = onProgrammers && urlProblemId != null && urlProblemId !== state.problemId;
+    const navigatedToDifferentProblem = onProgrammers && urlProblemId != null && urlProblemId !== state.problemId
+      && (!state.pendingProblemSwitch || state.pendingProblemSwitch.problemId !== urlProblemId);
+    // 확인 다이얼로그를 띄운 채로 사용자가 원래 보던 문제로 되돌아가면
+    // 더 이상 물어볼 이유가 없으니 조용히 취소한다.
+    const backToOriginalProblem = state.pendingProblemSwitch && urlProblemId === state.problemId;
 
     let shouldRender = false;
 
     if (onProgrammers !== state.onProgrammers) {
       state.onProgrammers = onProgrammers;
+      // 확인 대기 중에 프로그래머스를 완전히 벗어나면, renderShell()이 onProgrammers
+      // 여부와 무관하게 pendingProblemSwitch를 최우선으로 그려버려서 오프사이트
+      // 안내/비활성화 화면 대신 엉뚱하게 확인 카드가 계속 떠 있게 된다. 물어볼
+      // 대상 페이지 자체를 벗어났으니 조용히 취소한다.
+      if (!onProgrammers && state.pendingProblemSwitch) {
+        state.pendingProblemSwitch = null;
+      }
       shouldRender = true;
     }
 
     if (navigatedToDifferentProblem) {
-      state.problemId = urlProblemId;
-      state.problemTitle = null;
+      // 대화가 없는 상태(웰컴 메시지뿐이거나 방금 초기화됨)라면 잃을 게 없으니
+      // 굳이 확인받지 않고 바로 반영한다. 확인이 필요한 건 진행 중인 대화가
+      // 있을 때뿐이다.
+      if (hasActiveConversation()) {
+        state.pendingProblemSwitch = { problemId: urlProblemId };
+      } else {
+        applyProblemSwitch(urlProblemId, false);
+      }
       shouldRender = true;
-      syncPageContext().then(() => renderShell());
+    } else if (backToOriginalProblem) {
+      state.pendingProblemSwitch = null;
+      shouldRender = true;
     }
 
     if (shouldRender) {
@@ -1260,10 +1343,24 @@ async function initialize() {
     }
 
     if (changes.problemId) {
-      state.problemId = changes.problemId.newValue ?? null;
+      const newProblemId = changes.problemId.newValue ?? null;
+      // content.js가 CODE_CHANGED로 새 문제 id를 실시간 보고할 때도(코드 에디터를
+      // 스치기만 해도 발생) refreshActiveTabStatus()의 URL 기반 감지와 동일하게
+      // 진행 중인 대화가 있으면 확인을 받는다. 여기서 직접 덮어써버리면 그
+      // 확인 절차를 완전히 우회하게 된다.
+      if (newProblemId != null && newProblemId !== state.problemId
+        && (!state.pendingProblemSwitch || state.pendingProblemSwitch.problemId !== newProblemId)) {
+        if (hasActiveConversation()) {
+          state.pendingProblemSwitch = { problemId: newProblemId };
+        } else {
+          applyProblemSwitch(newProblemId, false);
+        }
+      } else if (newProblemId === state.problemId) {
+        state.pendingProblemSwitch = null;
+      }
     }
 
-    if (changes.problemTitle) {
+    if (changes.problemTitle && !state.pendingProblemSwitch) {
       state.problemTitle = changes.problemTitle.newValue || null;
     }
 
