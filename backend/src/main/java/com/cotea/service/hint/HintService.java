@@ -39,6 +39,7 @@ public class HintService {
     private final HintSelfReviewService hintSelfReviewService;
     private final ForbiddenConceptLlmSignal forbiddenConceptLlmSignal;
     private final OffTopicQuestionClassifier offTopicQuestionClassifier;
+    private final OffTopicRouteLlmClassifier offTopicRouteLlmClassifier;
     private final OffTopicLlmRouter offTopicLlmRouter;
     private final ConceptGapClassifier conceptGapClassifier;
     private final ConceptGapLlmSignal conceptGapLlmSignal;
@@ -58,14 +59,34 @@ public class HintService {
         request.setHintLevel(hintLevel);
 
         String question = questionResolver.resolve(request);
-        boolean offTopic = coteaProperties.getOffTopic().isEnabled()
-                && offTopicQuestionClassifier.isOffTopic(request, question);
-
-        if (offTopic) {
+        if (isOffTopicRoute(request, question, problem)) {
             return generateOffTopic(request, policy, problem, hintLevel, question, authorization);
         }
         boolean conceptGap = conceptGapClassifier.isConceptGap(request, question);
         return generateRelated(request, policy, problem, hintLevel, question, conceptGap, authorization);
+    }
+
+    private boolean isOffTopicRoute(HintRequest request, String question, JsonNode problem) {
+        if (!coteaProperties.getOffTopic().isEnabled()) {
+            return false;
+        }
+        OffTopicQuestionClassifier.Verdict verdict = offTopicQuestionClassifier.classify(request, question);
+        if (verdict == OffTopicQuestionClassifier.Verdict.RELATED) {
+            return false;
+        }
+        if (verdict == OffTopicQuestionClassifier.Verdict.OFF_TOPIC) {
+            return true;
+        }
+        // AMBIGUOUS
+        if (!coteaProperties.getOffTopic().isLlmRouteEnabled()) {
+            log.info("[OFF_TOPIC_ROUTE] llmRouteEnabled=false → RELATED");
+            return false;
+        }
+        String title = problem.path("source").path("title").asText("");
+        String level = problem.path("source").path("level").asText("");
+        OffTopicQuestionClassifier.Verdict llmVerdict =
+                offTopicRouteLlmClassifier.classify(question, title, level);
+        return llmVerdict == OffTopicQuestionClassifier.Verdict.OFF_TOPIC;
     }
 
     private HintResponse generateRelated(

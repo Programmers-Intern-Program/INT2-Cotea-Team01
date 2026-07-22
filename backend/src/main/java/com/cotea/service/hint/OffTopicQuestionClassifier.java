@@ -8,10 +8,18 @@ import org.springframework.stereotype.Component;
 
 /**
  * 전처리(문제 메타) 기반 힌트 경로 vs 범위 밖 FREE_TEXT 경로를 규칙으로 판별한다.
- * BUTTON은 항상 관련 질문. FREE_TEXT는 문제 풀이 신호가 없으면 off-topic.
+ *
+ * <p>BUTTON은 항상 RELATED. FREE_TEXT는 명확한 UNRELATED/RELATED만 규칙으로 확정하고,
+ * 키워드에 안 걸리는 짧은 질문은 {@link Verdict#AMBIGUOUS}로 남겨 LLM 라우터에 넘긴다.
  */
 @Component
 public class OffTopicQuestionClassifier {
+
+    public enum Verdict {
+        RELATED,
+        OFF_TOPIC,
+        AMBIGUOUS
+    }
 
     private static final Pattern RELATED = Pattern.compile(
             ".*(힌트|풀이|접근|구현|코드|왜\\s*틀|원인|오답|시간\\s*초과|런타임|방문|복잡도|"
@@ -30,22 +38,25 @@ public class OffTopicQuestionClassifier {
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
-    public boolean isOffTopic(HintRequest request, String question) {
+    public Verdict classify(HintRequest request, String question) {
         if (!"FREE_TEXT".equals(request.getQuestionType())) {
-            return false;
+            return Verdict.RELATED;
         }
         String q = question == null ? "" : question.trim().toLowerCase(Locale.ROOT);
         if (q.isEmpty()) {
-            return false;
+            return Verdict.RELATED;
         }
         if (UNRELATED.matcher(q).matches()) {
-            return true;
+            return Verdict.OFF_TOPIC;
         }
         if (RELATED.matcher(q).matches()) {
-            return false;
+            return Verdict.RELATED;
         }
         boolean matchesShortTerm = RELATED_SHORT_TERMS.stream()
                 .anyMatch(term -> KoreanBoundaryMatcher.containsAsStandaloneTerm(q, term));
-        return !matchesShortTerm;
+        if (matchesShortTerm) {
+            return Verdict.RELATED;
+        }
+        return Verdict.AMBIGUOUS;
     }
 }
