@@ -252,8 +252,25 @@ function getResultSource(headingText) {
 }
 
 function getGradingScopeText(headingEl) {
-  const scope = headingEl.closest('.console-content') || headingEl.parentElement;
-  return scope ? scope.textContent || '' : '';
+  // .console-content 전체 textContent를 스코프로 쓰면, 같은 컨테이너 안에 과거
+  // 결과 heading이 누적돼 있는 경우(제출을 여러 번 해도 이전 로그가 안 지워지는
+  // 구조라면) 새 제출 하나가 추가될 때마다 전체 텍스트가 바뀌면서 이미 처리했던
+  // 예전 heading들까지 "바뀐 것"으로 착각해 재처리(중복 알림)될 수 있다.
+  // 그래서 이 heading의 앞/뒤로 다른 .console-heading을 만나기 전까지만,
+  // 즉 "이 제출 한 건"의 결과 블록으로만 스코프를 좁힌다.
+  const isHeadingEl = (el) => el.classList && el.classList.contains('console-heading');
+
+  let before = '';
+  for (let node = headingEl.previousElementSibling; node && !isHeadingEl(node); node = node.previousElementSibling) {
+    before = (node.textContent || '') + before;
+  }
+
+  let after = headingEl.textContent || '';
+  for (let node = headingEl.nextElementSibling; node && !isHeadingEl(node); node = node.nextElementSibling) {
+    after += node.textContent || '';
+  }
+
+  return before + after;
 }
 
 function parseGradingPassed(scopeText) {
@@ -280,10 +297,10 @@ function parseFailureReason(scopeText) {
   // "실패 (런타임 에러)" 문구로만 구분 가능 (2026-07-22 실기기 DOM 확인).
   // \s는 일반 스페이스뿐 아니라 줄바꿈 방지용 non-breaking space( )도 매칭하므로
   // 괄호 안 공백 문자 종류에 상관없이 안전하게 잡는다.
-  if (/시간\s*초과/.test(scopeText)) {
+  if (/실패\s*\([^)]*시간\s*초과[^)]*\)/.test(scopeText)) {
     return 'TIME_LIMIT_EXCEEDED';
   }
-  if (/런타임\s*에러/.test(scopeText)) {
+  if (/실패\s*\([^)]*런타임\s*에러[^)]*\)/.test(scopeText)) {
     return 'RUNTIME_ERROR';
   }
   return 'WRONG_ANSWER';
