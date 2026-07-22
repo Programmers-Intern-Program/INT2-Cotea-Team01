@@ -23,9 +23,11 @@
 | language                    | string        | `ko` (한국어 본문 + 임베딩 매칭용 영어 기술 용어 포함)   |
 | embedding                   | vector        | 자동 생성, 수작업 입력 아님                              |
 
-### 20개 통제 어휘 (category)
+### 21개 통제 어휘 (category)
 
-`array`, `string`, `stack`, `queue_deque`, `hash_set`, `trees`, `graph_traversal`, `bfs`, `dfs`, `sorting`, `binary_search`, `two_pointer`, `sliding_window`, `prefix_sum`, `greedy`, `dp`, `bruteforcing`, `simulation`, `backtracking`, `priority_queue`
+`array`, `string`, `stack`, `queue_deque`, `hash_set`, `trees`, `graph_traversal`, `bfs`, `dfs`, `sorting`, `binary_search`, `two_pointer`, `sliding_window`, `prefix_sum`, `greedy`, `dp`, `bruteforcing`, `simulation`, `backtracking`, `priority_queue`, `math`
+
+(2026-07-22: `math` 추가. `docs/erd.md`는 이전부터 21개로 기록했지만 실제 `knowledge_base` 문서가 없어 불일치 상태였음 — `rag/data_source/knowledge_base/math.json` 추가로 해소. 작성 규칙은 `docs/knowledge-base-authoring-rules.md` 참고.)
 
 ### subcategory가 있는 카테고리 (접근 방식이 크게 갈리는 경우만)
 
