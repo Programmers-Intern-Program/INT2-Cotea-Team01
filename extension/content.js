@@ -81,6 +81,23 @@ function parseProblemId() {
   return null;
 }
 
+function detectSolvedStatus() {
+  const bodyText = document.body ? document.body.innerText.replace(/\s+/g, ' ') : '';
+  const solvedSignals = [
+    '정답입니다',
+    '정확성 테스트를 통과했습니다',
+    '테스트를 통과했습니다',
+    '채점을 통과했습니다',
+    'Accepted',
+  ];
+
+  if (solvedSignals.some((signal) => bodyText.includes(signal))) {
+    return true;
+  }
+
+  return null;
+}
+
 function getCurrentLanguage() {
   // 프로그래머스 언어 선택 버튼에서 현재 선택된 언어 확인
   let langButton = document.querySelector('div.dropdown-language button.btn.btn-sm.btn-dark');
@@ -201,6 +218,7 @@ function notifyIfChanged() {
       language,
       problemId: parseProblemId(),
       problemTitle: getProblemTitle(),
+      solved: detectSolvedStatus(),
     });
   } catch (_error) {
     handleContextInvalidated();
@@ -356,10 +374,11 @@ function readCodeWithRetry(tryCount, sendResponse) {
   const language = getCurrentLanguage();
   const problemId = parseProblemId();
   const problemTitle = getProblemTitle();
+  const solved = detectSolvedStatus();
 
   if (isEditorPresent()) {
     console.log('[Cotea Content] 코드 전송:', code.length, '자,', language);
-    sendResponse({ code, language, problemId, problemTitle });
+    sendResponse({ code, language, problemId, problemTitle, solved });
     return;
   }
 

@@ -91,6 +91,9 @@ public class UserHintLogEntity {
     @Column(name = "llm_provider", length = 50)
     private String llmProvider;
 
+    @Column
+    private Boolean solved;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -116,6 +119,7 @@ public class UserHintLogEntity {
         log.selectedProblemFields = command.selectedProblemFields();
         log.route = command.route();
         log.llmProvider = command.llmProvider();
+        log.solved = command.solved();
         return log;
     }
 
@@ -144,7 +148,8 @@ public class UserHintLogEntity {
             String promptPolicyVersion,
             String selectedProblemFields,
             String route,
-            String llmProvider
+            String llmProvider,
+            Boolean solved
     ) {
     }
 }

@@ -31,7 +31,7 @@ class UserHintLogAnalyticsTest {
 
     @Test
     void 최근_로그에서_태그별_빈도를_집계한다() {
-        when(userHintLogRepository.findByUserIdAndCreatedAtAfter(eq(1L), any(LocalDateTime.class)))
+        when(userHintLogRepository.findByUserIdAndCreatedAtAfterOrderByCreatedAtAsc(eq(1L), any(LocalDateTime.class)))
                 .thenReturn(List.of(
                         logWithTags("[\"bfs\",\"graph_traversal\"]"),
                         logWithTags("[\"bfs\"]")));
@@ -44,7 +44,7 @@ class UserHintLogAnalyticsTest {
 
     @Test
     void 태그_JSON이_깨지면_무시한다() {
-        when(userHintLogRepository.findByUserIdAndCreatedAtAfter(eq(2L), any(LocalDateTime.class)))
+        when(userHintLogRepository.findByUserIdAndCreatedAtAfterOrderByCreatedAtAsc(eq(2L), any(LocalDateTime.class)))
                 .thenReturn(List.of(logWithTags("not-json")));
 
         assertThat(analytics.countTagsForUser(2L, 7)).isEmpty();

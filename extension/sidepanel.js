@@ -55,6 +55,7 @@ const state = {
   latestCode: '',
   problemId: null,
   problemTitle: null,
+  problemSolved: null,
   stage: null,
   hintLevel: null,
   submissionResult: null,
@@ -73,6 +74,8 @@ const state = {
   loginSuccess: false,
   loginNotice: '',
   reportNotice: '',
+  reportLoading: false,
+  reportData: null,
 };
 
 const PROGRAMMERS_HOST = 'school.programmers.co.kr';
@@ -133,6 +136,7 @@ function buildHintRequest(questionText, chipLabel) {
     stage,
     userCode: state.latestCode || '',
     language: state.currentLanguage || 'Unknown',
+    solved: state.problemSolved === true ? true : (stage === 'WRONG_ANSWER' ? false : null),
     conversationHistory: buildConversationHistory(),
   };
 
@@ -188,6 +192,9 @@ async function syncPageContext() {
     if (response && response.problemTitle) {
       state.problemTitle = response.problemTitle;
     }
+    if (response && Object.prototype.hasOwnProperty.call(response, 'solved')) {
+      state.problemSolved = response.solved;
+    }
   } catch (_error) {
     // 프로그래머스 탭이 없으면 무시
   }
@@ -211,6 +218,112 @@ function applyAuthState(authState) {
   state.loggedIn = Boolean(authState && authState.accessToken);
   const user = authState && authState.user ? authState.user : null;
   state.kakaoNickname = user && user.nickname ? user.nickname : null;
+}
+
+function normalizeApiBaseUrl() {
+  return (state.apiConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+}
+
+function randomState() {
+  const values = new Uint32Array(4);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => value.toString(16)).join('');
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const errorBody = await response.json();
+      if (errorBody.message) {
+        detail = `: ${errorBody.message}`;
+      }
+    } catch (_error) {
+      // ignore parse errors
+    }
+    throw new Error(`로그인 API 요청 실패: ${response.status}${detail}`);
+  }
+  return response.json();
+}
+
+async function getKakaoRedirectUri() {
+  if (chrome.identity && typeof chrome.identity.getRedirectURL === 'function') {
+    return chrome.identity.getRedirectURL('kakao');
+  }
+  const response = await sendRuntimeMessage({ type: 'GET_KAKAO_REDIRECT_URI' });
+  if (!response || !response.ok || !response.redirectUri) {
+    throw new Error((response && response.error) || '카카오 리다이렉트 URI를 만들지 못했습니다.');
+  }
+  return response.redirectUri;
+}
+
+function launchKakaoAuthDirect(authorizeUrl) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow({ url: authorizeUrl, interactive: true }, (redirectUrl) => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+      if (!redirectUrl) {
+        reject(new Error('카카오 로그인 리다이렉트 URL을 받지 못했습니다.'));
+        return;
+      }
+      resolve(redirectUrl);
+    });
+  });
+}
+
+async function launchKakaoAuth(authorizeUrl) {
+  if (chrome.identity && typeof chrome.identity.launchWebAuthFlow === 'function') {
+    return launchKakaoAuthDirect(authorizeUrl);
+  }
+  const response = await sendRuntimeMessage({ type: 'LAUNCH_KAKAO_AUTH', authorizeUrl });
+  if (!response || !response.ok || !response.redirectUrl) {
+    throw new Error((response && response.error) || '카카오 로그인 창을 열지 못했습니다.');
+  }
+  return response.redirectUrl;
+}
+
+async function loginWithKakaoApi() {
+  const baseUrl = normalizeApiBaseUrl();
+  const redirectUri = await getKakaoRedirectUri();
+  const stateToken = randomState();
+
+  const authorize = await fetchJson(
+    `${baseUrl}/api/auth/kakao/authorize-url?redirectUri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(stateToken)}`
+  );
+  const redirectUrl = await launchKakaoAuth(authorize.authorizeUrl);
+  const redirected = new URL(redirectUrl);
+
+  const error = redirected.searchParams.get('error');
+  if (error) {
+    throw new Error(`카카오 로그인이 취소되었거나 실패했습니다: ${error}`);
+  }
+  if (redirected.searchParams.get('state') !== stateToken) {
+    throw new Error('카카오 로그인 state 값이 일치하지 않습니다.');
+  }
+
+  const code = redirected.searchParams.get('code');
+  if (!code) {
+    throw new Error('카카오 인가 코드를 받지 못했습니다.');
+  }
+
+  const auth = await fetchJson(`${baseUrl}/api/auth/kakao`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirectUri }),
+  });
+  const authState = {
+    accessToken: auth.accessToken,
+    tokenType: auth.tokenType || 'Bearer',
+    expiresIn: auth.expiresIn,
+    expiresAt: Date.now() + Number(auth.expiresIn || 0) * 1000,
+    user: auth.user || null,
+  };
+  await chrome.storage.local.set({ authState });
+  return authState;
 }
 
 function buildAvatarMarkup(glow, variant = 'chat') {
@@ -367,8 +480,9 @@ function renderRecommendationCards(recommendations) {
     <div class="rec-list">
       ${recommendations.map((rec) => {
         const level = rec.level ? `<span class="rec-card-level">${escapeHtml(rec.level)}</span>` : '';
+        const url = rec.url || buildProgrammersProblemUrl(rec.problemId);
         return `
-          <button type="button" class="rec-card" data-rec-url="${escapeHtml(rec.url || '')}" data-rec-problem="${escapeHtml(String(rec.problemId || ''))}">
+          <button type="button" class="rec-card" data-rec-url="${escapeHtml(url)}" data-rec-problem="${escapeHtml(String(rec.problemId || ''))}">
             <span class="rec-card-head">${escapeHtml(rec.title || '문제')} ${level}</span>
             ${rec.reason ? `<span class="rec-card-reason">${escapeHtml(rec.reason)}</span>` : ''}
           </button>
@@ -376,6 +490,13 @@ function renderRecommendationCards(recommendations) {
       }).join('')}
     </div>
   `;
+}
+
+function buildProgrammersProblemUrl(problemId) {
+  if (!problemId) {
+    return '';
+  }
+  return `https://school.programmers.co.kr/learn/courses/30/lessons/${encodeURIComponent(problemId)}?language=java`;
 }
 
 function renderBusyIndicator() {
@@ -496,7 +617,7 @@ function renderAccountButtonInner() {
 function renderProfileView() {
   return `
     <section class="login-view">
-      <div class="login-card">
+      <div class="login-card ${state.reportData ? 'login-card--report' : ''}">
         <div class="login-card-head">
           <p class="login-title">내 계정</p>
           <button type="button" id="login-close" class="login-close" aria-label="닫기">✕</button>
@@ -508,11 +629,86 @@ function renderProfileView() {
             <p class="profile-sub">카카오 계정으로 로그인됨</p>
           </div>
         </div>
-        <button type="button" id="report-button" class="report-button">리포트 보기</button>
+        <button type="button" id="report-button" class="report-button" ${state.reportLoading ? 'disabled' : ''}>
+          ${state.reportLoading ? '리포트 불러오는 중...' : '리포트 보기'}
+        </button>
         ${state.reportNotice ? `<p class="login-notice">${escapeHtml(state.reportNotice)}</p>` : ''}
+        ${state.reportData ? renderLearningReport(state.reportData) : ''}
         <button type="button" id="logout-button" class="logout-button">로그아웃</button>
       </div>
     </section>
+  `;
+}
+
+function renderLearningReport(report) {
+  const weaknessItems = renderReportCountItems(report.topWeaknessTypes);
+  const intentItems = renderReportCountItems(report.topIntents);
+  const tagItems = renderReportCountItems(report.topTags);
+  const insights = Array.isArray(report.insights) && report.insights.length > 0
+    ? report.insights.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
+    : '<li>아직 충분한 분석 데이터가 없습니다.</li>';
+  const reviewRecommendations = Array.isArray(report.reviewRecommendations) && report.reviewRecommendations.length > 0
+    ? renderRecommendationCards(report.reviewRecommendations)
+    : '<p class="report-empty">아직 복습 문제를 찾지 못했습니다. 질문 기록이 더 쌓이면 풀이 패턴에 맞춰 추천해드릴게요.</p>';
+  const diversityRecommendations = Array.isArray(report.diversityRecommendations) && report.diversityRecommendations.length > 0
+    ? renderRecommendationCards(report.diversityRecommendations)
+    : '<p class="report-empty">아직 다양성 추천 문제를 찾지 못했습니다. 더 많은 문제 데이터가 준비되면 추천해드릴게요.</p>';
+
+  return `
+    <section class="report-panel">
+      <div class="report-panel-head">
+        <div>
+          <p class="report-eyebrow">최근 ${escapeHtml(report.periodDays || 7)}일</p>
+          <h3>학습 리포트</h3>
+        </div>
+        <span class="report-count">${escapeHtml(report.totalHintCount || 0)}회</span>
+      </div>
+      <p class="report-summary">${escapeHtml(report.summary || '')}</p>
+      <div class="report-metrics">
+        <span>해결한 문제 ${escapeHtml(report.solvedProblemCount || 0)}개</span>
+        <span>AI 질문 ${escapeHtml(report.totalHintCount || 0)}회</span>
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">가장 자주 막힌 부분</p>
+        ${weaknessItems}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">자주 물어본 내용</p>
+        ${intentItems}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">자주 막힌 알고리즘</p>
+        ${tagItems}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">코칭 메모</p>
+        <ul class="report-insights">${insights}</ul>
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">복습 문제 추천</p>
+        ${reviewRecommendations}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">다양성 추천</p>
+        ${diversityRecommendations}
+      </div>
+    </section>
+  `;
+}
+
+function renderReportCountItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<p class="report-empty">아직 데이터가 없습니다.</p>';
+  }
+  return `
+    <div class="report-chip-list">
+      ${items.map((item) => `
+        <div class="report-chip">
+          <span>${escapeHtml(item.name || '')}</span>
+          <strong>${escapeHtml(item.count || 0)}회</strong>
+        </div>
+      `).join('')}
+    </div>
   `;
 }
 
@@ -851,11 +1047,8 @@ async function handleKakaoLogin() {
   renderShell();
 
   try {
-    const response = await sendRuntimeMessage({ type: 'LOGIN_KAKAO' });
-    if (!response || !response.ok) {
-      throw new Error((response && response.error) || '카카오 로그인에 실패했습니다.');
-    }
-    applyAuthState(response.authState);
+    const authState = await loginWithKakaoApi();
+    applyAuthState(authState);
     state.loginPending = false;
     state.loginSuccess = true;
     state.loginNotice = `${state.kakaoNickname || '카카오 사용자'}님 환영합니다!`;
@@ -889,10 +1082,16 @@ async function handleLogout() {
   applyAuthState(null);
   state.showLogin = false;
   state.reportNotice = '';
+  state.reportData = null;
+  state.reportLoading = false;
   renderShell();
 }
 
 async function handleWeeklyReport() {
+  if (state.reportLoading) {
+    return;
+  }
+  state.reportLoading = true;
   state.reportNotice = '최근 7일 리포트를 불러오는 중입니다...';
   renderShell();
 
@@ -901,26 +1100,14 @@ async function handleWeeklyReport() {
     if (!response || !response.ok) {
       throw new Error((response && response.error) || '리포트를 불러오지 못했습니다.');
     }
-    state.reportNotice = formatWeeklyReport(response.report);
+    state.reportData = response.report;
+    state.reportNotice = '';
   } catch (error) {
     state.reportNotice = error.message;
+  } finally {
+    state.reportLoading = false;
   }
   renderShell();
-}
-
-function formatWeeklyReport(report) {
-  if (!report || !report.totalHintCount) {
-    return '최근 7일 동안 저장된 힌트 요청이 없습니다.';
-  }
-
-  const topWeakness = report.topWeaknessTypes && report.topWeaknessTypes[0]
-    ? `${report.topWeaknessTypes[0].name} ${report.topWeaknessTypes[0].count}회`
-    : '약점 데이터 없음';
-  const topTag = report.topTags && report.topTags[0]
-    ? `${report.topTags[0].name} ${report.topTags[0].count}회`
-    : '태그 데이터 없음';
-
-  return `최근 ${report.periodDays}일 힌트 ${report.totalHintCount}회 · 주요 약점: ${topWeakness} · 자주 막힌 태그: ${topTag}`;
 }
 
 async function handleSync() {
@@ -949,6 +1136,9 @@ async function handleSync() {
       }
       if (response.problemTitle) {
         state.problemTitle = response.problemTitle;
+      }
+      if (Object.prototype.hasOwnProperty.call(response, 'solved')) {
+        state.problemSolved = response.solved;
       }
       if (response.warning) {
         state.messages.push({
@@ -1193,6 +1383,9 @@ async function initialize() {
     state.latestCode = response && response.latestCode ? response.latestCode : '';
     state.problemId = response && response.problemId != null ? response.problemId : null;
     state.problemTitle = response && response.problemTitle ? response.problemTitle : null;
+    state.problemSolved = response && Object.prototype.hasOwnProperty.call(response, 'problemSolved')
+      ? response.problemSolved
+      : null;
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
     applyAuthState(response && response.authState ? response.authState : null);
     state.codeDirty = Boolean(response && response.codeDirty);
@@ -1256,6 +1449,10 @@ async function initialize() {
 
     if (changes.problemTitle) {
       state.problemTitle = changes.problemTitle.newValue || null;
+    }
+
+    if (changes.problemSolved) {
+      state.problemSolved = changes.problemSolved.newValue ?? null;
     }
 
     if (changes.apiConfig) {
