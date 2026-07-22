@@ -14,6 +14,7 @@ public class HintRequestValidator {
             "WRONG_ANSWER",
             "AFTER_SOLVE"
     );
+    private static final String SUPPORTED_LANGUAGE = "java";
     private static final Set<String> QUESTION_TYPES = Set.of("BUTTON", "FREE_TEXT");
     private static final Set<String> HINT_BUTTONS = Set.of(
             "hint_level_1",
@@ -42,6 +43,7 @@ public class HintRequestValidator {
     public void validate(HintRequest request) {
         validateProblemId(request);
         validateStage(request.getStage());
+        validateLanguage(request.getLanguage());
         validateHintLevel(request.getHintLevel());
         validateQuestionType(request.getQuestionType());
         validateQuestionPayload(request);
@@ -57,6 +59,17 @@ public class HintRequestValidator {
     private void validateStage(String stage) {
         if (!STAGES.contains(stage)) {
             throw new CoteaException("INVALID_STAGE", "stage 값이 올바르지 않습니다.", 400);
+        }
+    }
+
+    private void validateLanguage(String language) {
+        // 프론트엔드가 언어 미지원 시 경고만 띄우고 전송 자체는 막지 않으므로(작업자
+        // 경고 무시 가능), 그리고 API를 직접 호출하는 경로는 프론트 검사를 아예 거치지
+        // 않으므로, 백엔드가 최종 방어선 역할을 한다. "java"만 대소문자 무관 정확히
+        // 일치할 때만 허용 - 프론트의 /java/i 부분일치 검사와 달리 "JavaScript" 같은
+        // 값이 잘못 통과하지 않도록 정확히 일치하는지 확인한다.
+        if (!SUPPORTED_LANGUAGE.equalsIgnoreCase(language)) {
+            throw new CoteaException("UNSUPPORTED_LANGUAGE", "지원하지 않는 언어입니다. Java만 지원합니다.", 400);
         }
     }
 

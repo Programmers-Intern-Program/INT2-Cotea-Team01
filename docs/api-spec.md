@@ -26,6 +26,7 @@
 
 - `MISSING_PROBLEM_ID` (400)
 - `INVALID_STAGE` (400)
+- `UNSUPPORTED_LANGUAGE` (400)
 - `AI_SERVICE_ERROR` (500)
 
 **응답 방식**: **단일 JSON 응답 (확정).** 스트리밍(SSE)은 MVP 스코프 아님 — 힌트 텍스트 길이가 짧아 스트리밍 이득이 크지 않다고 판단.
@@ -52,7 +53,7 @@
 | buttonId            | string        | questionType=BUTTON일 때 Y    | 사전 정의 버튼 질문 ID. **목록은 [`button-catalog.md`](./button-catalog.md) 참고** |
 | questionText        | string        | questionType=FREE_TEXT일 때 Y | 사용자가 직접 입력한 질문                                                                                                     |
 | userCode            | string        | Y                             | 현재 에디터에 작성된 코드 전체                                                                                                |
-| language            | string        | Y (없으면 `"Unknown"`)        | 에디터에서 감지된 코드 언어 (예: `"Java"`). 현재는 Java만 정식 지원하며, 향후 지식 베이스 `code_signals` 매칭 등 언어별 분기에 사용 예정              |
+| language            | string        | Y (`"java"`만 허용, 대소문자 무관) | 에디터에서 감지된 코드 언어 (예: `"Java"`). 현재는 Java만 정식 지원 — 없거나 `"java"`와 정확히 일치(대소문자 무관)하지 않으면 `400 UNSUPPORTED_LANGUAGE`. 향후 지식 베이스 `code_signals` 매칭 등 언어별 분기 확장 시 허용 목록에 추가 예정 |
 | conversationHistory | array         | Y (없으면 빈 배열)            | 지금까지의 대화. `[{ role: "user"                                                                                             | "assistant", text: string }]` |
 | submissionResult    | string (enum) | stage=WRONG_ANSWER일 때 Y     | 예: `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `RUNTIME_ERROR`. **프로그래머스 DOM에서 실제로 뽑아낼 수 있는 값인지 검증 필요**   |
 
@@ -82,6 +83,7 @@
   "questionType": "BUTTON",
   "buttonId": "hint_level_1",
   "userCode": "",
+  "language": "Java",
   "conversationHistory": []
 }
 ```
@@ -96,6 +98,7 @@
   "buttonId": "hint_level_1",
   "questionText": "완전 탐색 접근법이 안 떠올라요",
   "userCode": "",
+  "language": "Java",
   "conversationHistory": [...]
 }
 ```
@@ -122,6 +125,7 @@
 
 - `400 MISSING_PROBLEM_ID` — problemId 누락
 - `400 INVALID_STAGE` — stage 값 오류
+- `400 UNSUPPORTED_LANGUAGE` — language가 없거나 `"java"`(대소문자 무관)와 정확히 일치하지 않음
 - `400 INVALID_HINT_LEVEL` — hintLevel이 1~4 범위를 벗어남
 - `400 INVALID_QUESTION_TYPE` — questionType 값 오류
 - `400 MISSING_BUTTON_ID` — `questionType=BUTTON`인데 buttonId 누락
