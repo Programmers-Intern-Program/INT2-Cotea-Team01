@@ -9,17 +9,27 @@ const DEFAULT_PROBLEM_ID = 1829;
 const AVATAR_URL = chrome.runtime.getURL('mascot.png');
 
 const STAGE_OPTIONS = [
-  { value: 'BEFORE_SOLVE', label: '아직 못 풀었어요', colorClass: 'stage-before-solve' },
-  { value: 'WRONG_ANSWER', label: '오답이에요', colorClass: 'stage-wrong-answer' },
+  { value: 'BEFORE_SOLVE', label: '도전', colorClass: 'stage-before-solve' },
+  { value: 'WRONG_ANSWER', label: '오답', colorClass: 'stage-wrong-answer' },
 ];
 
 const STAGE_LABEL = Object.fromEntries(STAGE_OPTIONS.map((opt) => [opt.value, opt.label]));
 
+// Lucide 아이콘과 동일한 24x24 stroke 스타일로 직접 작성한 인라인 SVG.
+// (이 프로젝트엔 React/번들러가 없어 lucide-react를 쓸 수 없고, 계정/동기화
+// 버튼 아이콘과 같은 방식으로 순수 SVG 문자열을 사용한다.)
+const HINT_ICON_SVG = {
+  eye: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+  target: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>',
+  wrench: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"></path></svg>',
+  fileText: '<svg class="hint-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>',
+};
+
 const HINT_LEVEL_OPTIONS = [
-  { hintLevel: 1, buttonId: 'hint_level_1', label: '1단계 관점 힌트', question: '이 문제를 어떤 관점에서 바라봐야 할지 모르겠어요' },
-  { hintLevel: 2, buttonId: 'hint_level_2', label: '2단계 접근 힌트', question: '어떤 알고리즘으로 접근해야 할지 모르겠어요' },
-  { hintLevel: 3, buttonId: 'hint_level_3', label: '3단계 구현 힌트', question: '구현 순서가 잘 안 잡혀요' },
-  { hintLevel: 4, buttonId: 'hint_level_4', label: '4단계 코드 리뷰', question: '제 코드에서 문제가 있는지 봐주세요' },
+  { hintLevel: 1, buttonId: 'hint_level_1', label: '관점 힌트', icon: HINT_ICON_SVG.eye, question: '이 문제를 어떤 관점에서 바라봐야 할지 모르겠어요' },
+  { hintLevel: 2, buttonId: 'hint_level_2', label: '접근 힌트', icon: HINT_ICON_SVG.target, question: '어떤 알고리즘으로 접근해야 할지 모르겠어요' },
+  { hintLevel: 3, buttonId: 'hint_level_3', label: '구현 힌트', icon: HINT_ICON_SVG.wrench, question: '구현 순서가 잘 안 잡혀요' },
+  { hintLevel: 4, buttonId: 'hint_level_4', label: '코드 리뷰', icon: HINT_ICON_SVG.fileText, question: '제 코드에서 문제가 있는지 봐주세요' },
 ];
 
 const SUBMISSION_RESULT_OPTIONS = [
@@ -46,9 +56,9 @@ const state = {
   problemId: null,
   problemTitle: null,
   stage: null,
-  stagePickerOpen: true,
   hintLevel: null,
   submissionResult: null,
+  lastMessageStage: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
   codeDirty: false,
@@ -88,16 +98,9 @@ function escapeHtml(value) {
 }
 
 function isComposerReady() {
-  if (!state.stage) {
-    return false;
-  }
-  if (state.stage === 'BEFORE_SOLVE' && !state.hintLevel) {
-    return false;
-  }
-  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
-    return false;
-  }
-  return true;
+  // 힌트 레벨/채점 결과는 세부 분류일 뿐이라, 상태(도전/오답)만 골랐으면
+  // 자유 입력을 막지 않는다. 미선택 시 기본값 처리는 handleSend에서 한다.
+  return Boolean(state.stage);
 }
 
 function pushStageDivider(label) {
@@ -159,11 +162,13 @@ function ensureWelcomeMessage() {
     return;
   }
 
-  const problemLabel = state.problemId ? `문제 #${state.problemId}` : '프로그래머스 문제';
+  // 문제 번호를 언급하면, 대화 도중 실시간으로 다른 문제로 넘어가도 웰컴
+  // 메시지는 그대로 남아있어서 예전 문제 번호와 안 맞는 문구가 돼버린다.
+  // 그래서 특정 문제를 지칭하지 않는 문구로 고정한다.
   state.messages.push({
     id: Date.now(),
     role: 'ai',
-    text: `안녕하세요! 저는 Cotea예요.\n\n${problemLabel}를 함께 풀어봐요. 먼저 아래에서 지금 상태를 선택해 주세요.`,
+    text: '안녕하세요! 저는 Cotea예요.\n\n문제를 함께 풀어봐요. 먼저 아래에서 지금 상태를 선택해 주세요.\n아직 문제를 푸는 중이라면 "도전"을, 제출했지만 틀렸다면 "오답"을 눌러주세요.',
     timestamp: nowLabel(),
   });
 }
@@ -391,6 +396,12 @@ function renderBusyIndicator() {
 }
 
 function renderHeaderTitle() {
+  // 다른 사이트에 있을 땐 problemId/problemTitle이 storage에 남아있어도
+  // 마지막으로 봤던 문제 정보를 보여주면 안 된다 (프로그래머스를 보고 있는
+  // 것처럼 착각하게 됨).
+  if (!state.onProgrammers) {
+    return '프로그래머스 문제';
+  }
   if (state.problemTitle) {
     return `프로그래머스 문제 - ${state.problemTitle}`;
   }
@@ -424,27 +435,10 @@ function renderComposerPlaceholder() {
   if (!state.stage) {
     return '먼저 위에서 지금 상태를 선택해주세요';
   }
-  if (state.stage === 'BEFORE_SOLVE' && !state.hintLevel) {
-    return '힌트 레벨을 선택해주세요';
-  }
-  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
-    return '채점 결과를 선택해주세요';
-  }
   return 'Cotea에게 질문하세요...';
 }
 
 function renderStageSelector() {
-  if (state.stage && !state.stagePickerOpen) {
-    const opt = STAGE_OPTIONS.find((o) => o.value === state.stage);
-    return `
-      <div class="stage-select-row">
-        <button type="button" class="stage-chip current ${opt ? opt.colorClass : ''}" data-stage-change ${!state.onProgrammers || state.busy ? 'disabled' : ''}>
-          상태: ${escapeHtml(opt ? opt.label : state.stage)}<span class="stage-chip-edit">변경</span>
-        </button>
-      </div>
-    `;
-  }
-
   return `
     <div class="stage-select-row">
       ${STAGE_OPTIONS.map((opt) => {
@@ -463,7 +457,7 @@ function renderHintLevelSelector() {
     <div class="sub-select-row hint-level-grid">
       ${HINT_LEVEL_OPTIONS.map((opt) => {
         const active = state.hintLevel === opt.hintLevel;
-        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${opt.icon}<span>${escapeHtml(opt.label)}</span></button>`;
       }).join('')}
     </div>
   `;
@@ -601,14 +595,15 @@ function renderShell() {
         </section>
 
         <div class="cotea-bottom-shell">
-          ${renderStageSelector()}
+          <div class="stage-row-wrap">
+            ${renderStageSelector()}
+            <div class="sync-row">
+              <span class="sync-dot ${renderSyncDotClass()}"></span>
+              <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
+            </div>
+          </div>
           ${renderHintLevelSelector()}
           ${renderSubmissionResultSelector()}
-
-          <div class="sync-row">
-            <span class="sync-dot ${renderSyncDotClass()}"></span>
-            <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
-          </div>
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
@@ -734,17 +729,6 @@ function bindEvents() {
     });
   });
 
-  const stageChangeButton = document.querySelector('[data-stage-change]');
-  if (stageChangeButton) {
-    stageChangeButton.addEventListener('click', () => {
-      if (state.busy) {
-        return;
-      }
-      state.stagePickerOpen = true;
-      renderShell();
-    });
-  }
-
   document.querySelectorAll('[data-hint-level]').forEach((button) => {
     button.addEventListener('click', () => {
       handleHintLevelSelect(Number(button.dataset.hintLevel));
@@ -773,17 +757,15 @@ function handleStageSelect(value) {
     return;
   }
   if (state.stage === value) {
-    state.stagePickerOpen = false;
-    renderShell();
     return;
   }
+  // 버튼 클릭 시점엔 구분선을 남기지 않는다 - 실제로 질문을 보낼 때
+  // handleSend에서 그 시점의 상태를 기준으로 필요하면 남긴다.
   state.stage = value;
-  state.stagePickerOpen = false;
   state.hintLevel = null;
   state.submissionResult = null;
   state.activeChip = null;
   state.input = '';
-  pushStageDivider(STAGE_LABEL[value] || value);
   renderShell();
 }
 
@@ -800,10 +782,17 @@ function applyGradingResult(gradingResult) {
   if (gradingResult.problemId == null || gradingResult.problemId !== state.problemId) {
     return;
   }
+  // 지금 실제로 프로그래머스 문제 페이지를 보고 있을 때만 반영한다. problemId가
+  // 우연히 일치하더라도, 패널이 다른 사이트/문제 목록 페이지를 보고 있는 동안
+  // (onProgrammers=false) 실시간 채점 결과(chrome.storage.onChanged)가 와서
+  // 상태를 바꿔버리는 걸 막기 위함. problemId 검사와 마찬가지로 호출부
+  // (초기 로딩/실시간 반영) 둘 다 이 한 곳만 거치면 되도록 여기서 검사한다.
+  if (!state.onProgrammers) {
+    return;
+  }
 
   const alreadyInWrongAnswerFlow = state.stage === 'WRONG_ANSWER';
   state.stage = 'WRONG_ANSWER';
-  state.stagePickerOpen = false;
   state.hintLevel = null;
   state.activeChip = null;
   if (!state.submissionResult) {
@@ -811,6 +800,9 @@ function applyGradingResult(gradingResult) {
   }
   const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
   pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요` : `${sourceLabel} 자동 감지: 오답이에요`);
+  // 여기서 이미 구분선을 남겼으니, 바로 이어서 질문을 보내도 handleSend가
+  // 상태 변화로 착각해 중복 구분선을 또 남기지 않도록 동기화해둔다.
+  state.lastMessageStage = 'WRONG_ANSWER';
 }
 
 function handleHintLevelSelect(level) {
@@ -1101,6 +1093,20 @@ async function handleSend() {
     return;
   }
 
+  // 오답 상태에서 채점 결과를 안 골라도 자유 입력이 가능해야 하는데,
+  // 백엔드는 WRONG_ANSWER 단계에서 submissionResult를 필수로 요구한다
+  // (HintRequestValidator.validateSubmissionResult). 안 골랐으면 기본값으로 채운다.
+  if (state.stage === 'WRONG_ANSWER' && !state.submissionResult) {
+    state.submissionResult = 'WRONG_ANSWER';
+  }
+
+  // 상태를 바꿀 때마다가 아니라, 실제로 질문을 보낼 때 그 시점의 상태가
+  // 직전 질문 때와 달라졌으면 그때만 구분선을 남긴다.
+  if (state.stage !== state.lastMessageStage) {
+    pushStageDivider(STAGE_LABEL[state.stage] || state.stage);
+    state.lastMessageStage = state.stage;
+  }
+
   state.busy = true;
   renderShell();
   // 질문을 보내기 직전에 항상 최신 코드로 재동기화한다 (수동 동기화 버튼에만
@@ -1113,17 +1119,68 @@ async function handleSend() {
   await dispatchHintRequest(hintRequest, question);
 }
 
-function refreshActiveTabStatus() {
-  if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
-    return;
+function parseProblemIdFromUrl(url) {
+  if (!url) {
+    return null;
   }
+  // content.js의 parseProblemId()와 동일한 패턴 - 문제 상세 페이지인지 판별용
+  const patterns = [
+    /\/lessons\/(\d+)/,
+    /\/challenges\/(\d+)/,
+    /[?&]problem_id=(\d+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+  return null;
+}
 
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const activeTab = tabs && tabs[0];
-    const onProgrammers = Boolean(activeTab && activeTab.url && activeTab.url.includes(PROGRAMMERS_HOST));
+function isTabOnProgrammers(tab) {
+  // 도메인만 확인하면 문제 목록 페이지(코드 에디터가 없는 페이지)도 true가 되어
+  // storage에 남아있는 예전 문제 번호가 그대로 노출된다. 실제 문제 상세 페이지인
+  // 경우에만 true로 취급한다.
+  return Boolean(tab && tab.url && tab.url.includes(PROGRAMMERS_HOST) && parseProblemIdFromUrl(tab.url) != null);
+}
+
+function queryActiveTab() {
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') {
+      resolve(null);
+      return;
+    }
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      resolve(tabs && tabs[0] ? tabs[0] : null);
+    });
+  });
+}
+
+function refreshActiveTabStatus() {
+  queryActiveTab().then((activeTab) => {
+    const onProgrammers = isTabOnProgrammers(activeTab);
+    const urlProblemId = onProgrammers ? parseProblemIdFromUrl(activeTab.url) : null;
+    // 다른 문제로 이동한 직후엔 storage/state에 남아있던 "이전 문제" 제목이
+    // content.js의 CODE_CHANGED 감지(최대 1초 지연)가 오기 전까지 그대로 노출되던
+    // 문제를 고치기 위해, URL만으로 번호를 먼저 갱신하고 제목은 비워둔다.
+    const navigatedToDifferentProblem = onProgrammers && urlProblemId != null && urlProblemId !== state.problemId;
+
+    let shouldRender = false;
 
     if (onProgrammers !== state.onProgrammers) {
       state.onProgrammers = onProgrammers;
+      shouldRender = true;
+    }
+
+    if (navigatedToDifferentProblem) {
+      state.problemId = urlProblemId;
+      state.problemTitle = null;
+      shouldRender = true;
+      syncPageContext().then(() => renderShell());
+    }
+
+    if (shouldRender) {
       renderShell();
     }
   });
@@ -1158,11 +1215,18 @@ async function initialize() {
   }
 
   await syncPageContext();
+
+  // 패널을 연 시점에 실제로 프로그래머스 탭을 보고 있는지 먼저 확인한다.
+  // problemId/gradingResult는 다른 사이트로 넘어가도 storage에 마지막 문제
+  // 상태로 계속 남아있어서, 이 확인 없이는 웰컴 메시지/헤더에 예전 문제 번호가
+  // 그대로 뜨고 예전 채점 결과가 방금 감지된 것처럼 재생돼버린다.
+  const initialActiveTab = await queryActiveTab();
+  state.onProgrammers = isTabOnProgrammers(initialActiveTab);
+
   ensureWelcomeMessage();
   if (pendingGradingResult) {
     applyGradingResult(pendingGradingResult);
   }
-  refreshActiveTabStatus();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
     if (chrome.tabs.onActivated) {

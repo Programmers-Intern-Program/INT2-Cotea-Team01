@@ -587,8 +587,27 @@ button {
   padding: 12px 14px 0;
 }
 
+.stage-row-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 12px 0 8px;
+}
+
+.stage-row-wrap .stage-select-row {
+  padding: 0 0 0 14px;
+}
+
+.stage-row-wrap .sync-row {
+  padding: 0 14px 0 0;
+  margin-left: auto;
+  text-align: right;
+}
+
 .sub-select-row {
   padding-top: 8px;
+  padding-bottom: 10px;
 }
 
 .hint-level-grid {
@@ -597,11 +616,18 @@ button {
 }
 
 .hint-level-grid .sub-chip {
-  text-align: center;
+  justify-content: center;
+}
+
+.hint-icon {
+  flex-shrink: 0;
 }
 
 .stage-chip,
 .sub-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1.5px solid rgba(27, 42, 74, 0.11);
@@ -625,27 +651,12 @@ button {
   cursor: default;
 }
 
-.stage-chip.current {
-  border-color: transparent;
-  background: #1b2a4a;
-  color: #eef2ff;
-}
-
-.stage-chip.active.stage-before-solve,
-.stage-chip.current.stage-before-solve {
+.stage-chip.active.stage-before-solve {
   background: #2563eb;
 }
 
-.stage-chip.active.stage-wrong-answer,
-.stage-chip.current.stage-wrong-answer {
+.stage-chip.active.stage-wrong-answer {
   background: #dc2626;
-}
-
-.stage-chip-edit {
-  margin-left: 6px;
-  font-size: 9px;
-  font-weight: 700;
-  opacity: 0.55;
 }
 
 .prompt-chip-row {
@@ -729,14 +740,20 @@ button {
   align-items: center;
   gap: 8px;
   margin: 0 14px;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
   background: #f1f4f9;
-  border: 1.5px solid rgba(27, 42, 74, 0.1);
+  border: 1.5px solid rgba(27, 42, 74, 0.14);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .composer-row.caret-mode {
   border-color: rgba(27, 42, 74, 0.32);
+}
+
+.composer-row:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 .composer-input-wrap {
