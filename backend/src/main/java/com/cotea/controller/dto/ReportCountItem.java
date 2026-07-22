@@ -7,6 +7,7 @@ import lombok.Getter;
 @Builder
 public class ReportCountItem {
 
+    private final String code;
     private final String name;
     private final long count;
     private final String message;

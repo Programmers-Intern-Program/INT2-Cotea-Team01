@@ -29,6 +29,7 @@ public class HintRequest {
     private String userCode;
     private String language;
     private String submissionResult;
+    private Boolean solved;
     private List<ConversationMessage> conversationHistory = new ArrayList<>();
 
     /** 로컬 테스트용 — api-spec 공개 필드 아님 */
