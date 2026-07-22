@@ -70,7 +70,10 @@ public class HintService {
         if (!coteaProperties.getOffTopic().isEnabled()) {
             return false;
         }
-        OffTopicQuestionClassifier.Verdict verdict = offTopicQuestionClassifier.classify(request, question);
+        String title = problem.path("source").path("title").asText("");
+        String level = problem.path("source").path("level").asText("");
+        OffTopicQuestionClassifier.Verdict verdict =
+                offTopicQuestionClassifier.classify(request, question, title);
         if (verdict == OffTopicQuestionClassifier.Verdict.RELATED) {
             return false;
         }
@@ -82,8 +85,6 @@ public class HintService {
             log.info("[OFF_TOPIC_ROUTE] llmRouteEnabled=false → RELATED");
             return false;
         }
-        String title = problem.path("source").path("title").asText("");
-        String level = problem.path("source").path("level").asText("");
         OffTopicQuestionClassifier.Verdict llmVerdict =
                 offTopicRouteLlmClassifier.classify(question, title, level);
         return llmVerdict == OffTopicQuestionClassifier.Verdict.OFF_TOPIC;

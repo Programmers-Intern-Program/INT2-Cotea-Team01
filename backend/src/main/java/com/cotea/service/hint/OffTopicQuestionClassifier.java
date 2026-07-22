@@ -11,6 +11,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>BUTTON은 항상 RELATED. FREE_TEXT는 명확한 UNRELATED/RELATED만 규칙으로 확정하고,
  * 키워드에 안 걸리는 짧은 질문은 {@link Verdict#AMBIGUOUS}로 남겨 LLM 라우터에 넘긴다.
+ *
+ * <p>UNRELATED 키워드가 있어도 문제 제목과 겹치거나 userCode가 있으면
+ * 하드 OFF_TOPIC이 아니라 {@link Verdict#AMBIGUOUS}로 올린다
+ * (예: 주식가격 문제에서 "주식"이 자연스럽게 등장하는 경우).
  */
 @Component
 public class OffTopicQuestionClassifier {
@@ -38,7 +42,17 @@ public class OffTopicQuestionClassifier {
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
+    /** 문제 제목 겹침 검사용 — UNRELATED 도메인 단어(잡담 vs 문제 소재). */
+    private static final List<String> UNRELATED_DOMAIN_TERMS = List.of(
+            "점심", "저녁", "날씨", "영화", "노래", "연예", "주식", "비트코인",
+            "사랑", "연애", "심심해", "농담", "게임"
+    );
+
     public Verdict classify(HintRequest request, String question) {
+        return classify(request, question, null);
+    }
+
+    public Verdict classify(HintRequest request, String question, String problemTitle) {
         if (!"FREE_TEXT".equals(request.getQuestionType())) {
             return Verdict.RELATED;
         }
@@ -47,6 +61,9 @@ public class OffTopicQuestionClassifier {
             return Verdict.RELATED;
         }
         if (UNRELATED.matcher(q).matches()) {
+            if (hasProblemContext(request, q, problemTitle)) {
+                return Verdict.AMBIGUOUS;
+            }
             return Verdict.OFF_TOPIC;
         }
         if (RELATED.matcher(q).matches()) {
@@ -58,5 +75,26 @@ public class OffTopicQuestionClassifier {
             return Verdict.RELATED;
         }
         return Verdict.AMBIGUOUS;
+    }
+
+    /**
+     * UNRELATED 키워드가 문제 맥락일 수 있는지.
+     * - userCode가 있으면 풀이 중으로 본다.
+     * - 질문·문제 제목에 같은 도메인 단어가 있으면 문제 소재로 본다.
+     */
+    private boolean hasProblemContext(HintRequest request, String questionLower, String problemTitle) {
+        if (request.getUserCode() != null && !request.getUserCode().isBlank()) {
+            return true;
+        }
+        if (problemTitle == null || problemTitle.isBlank()) {
+            return false;
+        }
+        String title = problemTitle.toLowerCase(Locale.ROOT);
+        for (String term : UNRELATED_DOMAIN_TERMS) {
+            if (questionLower.contains(term) && title.contains(term)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

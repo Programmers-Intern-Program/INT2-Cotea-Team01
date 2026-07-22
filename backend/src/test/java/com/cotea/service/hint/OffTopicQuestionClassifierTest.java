@@ -63,6 +63,37 @@ class OffTopicQuestionClassifierTest {
     }
 
     @Test
+    void stockKeywordWithProblemTitleIsAmbiguous() {
+        HintRequest request = freeTextRequest();
+
+        assertThat(classifier.classify(
+                request,
+                "주식 가격 계산 결과가 맞게 나오는지 한번만 봐주실 수 있나요?",
+                "주식가격"))
+                .isEqualTo(Verdict.AMBIGUOUS);
+    }
+
+    @Test
+    void stockKeywordWithUserCodeIsAmbiguous() {
+        HintRequest request = freeTextRequest();
+        request.setUserCode("class Solution { public int[] solution(int[] prices) { return prices; } }");
+
+        assertThat(classifier.classify(
+                request,
+                "주식 가격 계산 결과가 맞게 나오는지 한번만 봐주실 수 있나요?",
+                "카카오프렌즈 컬러링북"))
+                .isEqualTo(Verdict.AMBIGUOUS);
+    }
+
+    @Test
+    void stockKeywordWithoutContextIsOffTopic() {
+        HintRequest request = freeTextRequest();
+
+        assertThat(classifier.classify(request, "오늘 주식 어때?", "카카오프렌즈 컬러링북"))
+                .isEqualTo(Verdict.OFF_TOPIC);
+    }
+
+    @Test
     void wordSharingPrefixWithShortRelatedTermIsAmbiguous() {
         HintRequest request = freeTextRequest();
 
