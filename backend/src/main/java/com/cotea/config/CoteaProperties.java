@@ -53,6 +53,11 @@ public class CoteaProperties {
     public static class OffTopic {
         /** FREE_TEXT 질문을 저렴한 OpenAI(실패 시 Claude)로 돌릴지 */
         private boolean enabled = true;
+        /**
+         * 규칙으로 판별되지 않은 FREE_TEXT를 OpenAI로 RELATED/OFF_TOPIC 라우팅할지.
+         * false면 ambiguous는 RELATED로 처리한다.
+         */
+        private boolean llmRouteEnabled = true;
     }
 
     @Getter
