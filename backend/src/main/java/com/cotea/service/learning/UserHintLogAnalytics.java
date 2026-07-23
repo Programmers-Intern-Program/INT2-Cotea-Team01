@@ -26,7 +26,7 @@ public class UserHintLogAnalytics {
     public List<UserHintLogEntity> findRecentLogs(long userId, int days) {
         int periodDays = normalizeDays(days);
         LocalDateTime since = LocalDateTime.now().minusDays(periodDays);
-        return userHintLogRepository.findByUserIdAndCreatedAtAfter(userId, since);
+        return userHintLogRepository.findByUserIdAndCreatedAtAfterOrderByCreatedAtAsc(userId, since);
     }
 
     public Map<String, Long> countTagsForUser(long userId, int days) {

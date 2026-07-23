@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserHintLogRepository extends JpaRepository<UserHintLogEntity, Long> {
 
-    List<UserHintLogEntity> findByUserIdAndCreatedAtAfter(Long userId, LocalDateTime createdAt);
+    List<UserHintLogEntity> findByUserIdAndCreatedAtAfterOrderByCreatedAtAsc(Long userId, LocalDateTime createdAt);
 }

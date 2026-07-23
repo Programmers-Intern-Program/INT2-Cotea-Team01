@@ -181,9 +181,9 @@ class RecommendationServiceTest {
         assertThat(response.getRecommendations()).hasSize(2);
         assertThat(response.getRecommendations().get(0).getProblemId()).isEqualTo(100);
         assertThat(response.getRecommendations().get(0).getReason())
-                .contains("최근 이 유형에서 자주 막혀서");
+                .contains("최근 자주 막혔던 풀이 흐름");
         assertThat(response.getRecommendations().get(1).getReason())
-                .doesNotContain("최근 이 유형에서 자주 막혀서");
+                .doesNotContain("BFS", "DFS", "이 유형");
     }
 
     private static ProblemEntity problem(int id, String title, String level) {

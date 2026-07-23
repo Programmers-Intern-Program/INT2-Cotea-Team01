@@ -63,7 +63,8 @@ public class LearningLogService {
                 context.policy().path("schemaVersion").asText(""),
                 toJson(selectedProblemFields(context.problemContext())),
                 context.route(),
-                context.llmProvider()
+                context.llmProvider(),
+                request.getSolved()
         ));
         userHintLogRepository.save(log);
     }
