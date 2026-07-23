@@ -200,6 +200,9 @@ function buildHintRequestBody(message) {
   if (hintRequest.stage === 'WRONG_ANSWER' && hintRequest.submissionResult) {
     body.submissionResult = hintRequest.submissionResult;
   }
+  if (Object.prototype.hasOwnProperty.call(hintRequest, 'solved')) {
+    body.solved = hintRequest.solved;
+  }
 
   return body;
 }
@@ -309,6 +312,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.problemTitle) {
           nextState.problemTitle = message.problemTitle;
         }
+        if (Object.prototype.hasOwnProperty.call(message, 'solved')) {
+          nextState.problemSolved = message.solved;
+        }
         if (message.language) {
           nextState.currentLanguage = message.language;
           nextState.languageNotSupported = !/java/i.test(message.language);
@@ -347,6 +353,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       currentLanguage: 'Java',
       problemId: null,
       problemTitle: null,
+      problemSolved: null,
       apiConfig: DEFAULT_API_CONFIG,
       authState: null,
       codeDirty: false,
@@ -367,6 +374,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.error('[Cotea] 카카오 로그인 실패:', error.message);
         sendResponse({ ok: false, error: error.message });
       });
+    return true;
+  }
+
+  if (message.type === 'GET_KAKAO_REDIRECT_URI') {
+    try {
+      sendResponse({ ok: true, redirectUri: getKakaoRedirectUri() });
+    } catch (error) {
+      sendResponse({ ok: false, error: error.message });
+    }
+    return false;
+  }
+
+  if (message.type === 'LAUNCH_KAKAO_AUTH') {
+    launchWebAuthFlow({
+      url: message.authorizeUrl,
+      interactive: true,
+    })
+      .then((redirectUrl) => sendResponse({ ok: true, redirectUrl }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
@@ -457,6 +483,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           if (response.problemTitle) {
             nextState.problemTitle = response.problemTitle;
+          }
+          if (Object.prototype.hasOwnProperty.call(response, 'solved')) {
+            nextState.problemSolved = response.solved;
           }
           chrome.storage.local.set(nextState);
 

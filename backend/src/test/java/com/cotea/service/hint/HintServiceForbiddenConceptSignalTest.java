@@ -173,6 +173,7 @@ class HintServiceForbiddenConceptSignalTest {
         request.setHintLevel(1);
         request.setQuestionType("BUTTON");
         request.setButtonId("hint_level_1");
+        request.setLanguage("Java");
         return request;
     }
 }

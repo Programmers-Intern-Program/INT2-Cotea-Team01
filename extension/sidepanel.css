@@ -886,6 +886,10 @@ button {
   gap: 12px;
 }
 
+.login-card--report {
+  max-width: 330px;
+}
+
 .login-card-head {
   display: flex;
   align-items: center;
@@ -1056,6 +1060,132 @@ button {
   background: #24345c;
 }
 
+.report-button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.report-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(27, 42, 74, 0.08);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.report-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-panel-head h3,
+.report-eyebrow,
+.report-summary,
+.report-section-title,
+.report-empty,
+.report-insights {
+  margin: 0;
+}
+
+.report-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(37, 99, 235, 0.75);
+}
+
+.report-panel-head h3 {
+  margin-top: 2px;
+  font-size: 14px;
+  color: #1b2a4a;
+}
+
+.report-count {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.report-summary {
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(27, 42, 74, 0.72);
+}
+
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.report-metrics span {
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: rgba(27, 42, 74, 0.68);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.report-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.report-section-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #1b2a4a;
+}
+
+.report-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.report-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(27, 42, 74, 0.08);
+  color: rgba(27, 42, 74, 0.7);
+  font-size: 10px;
+}
+
+.report-chip strong {
+  color: #1d4ed8;
+}
+
+.report-insights {
+  padding-left: 16px;
+  color: rgba(27, 42, 74, 0.68);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.report-insights li + li {
+  margin-top: 4px;
+}
+
+.report-empty {
+  color: rgba(27, 42, 74, 0.45);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
 .logout-button {
   padding: 10px;
   border: 1.5px solid rgba(27, 42, 74, 0.12);
@@ -1124,4 +1254,3 @@ button {
   line-height: 1.5;
   color: rgba(27, 42, 74, 0.62);
 }
-
