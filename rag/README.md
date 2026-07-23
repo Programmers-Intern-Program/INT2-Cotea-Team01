@@ -65,7 +65,7 @@
 1. **category(+subcategory) 정확 매칭** (하드 필터): 문제의 `classification.primary[].tag`로 `knowledge_base_docs.json`에서 문서를 조회합니다. `subcategory`가 없는 카테고리는 태그만으로 문서가 하나로 정해지지만, `subcategory`가 여러 개로 나뉜 카테고리(예: `dp`)는 문제가 `classification.primary[].subcategory`를 지정하지 않으면 그 카테고리의 문서 전부가 매칭되고, 지정하면 일치하는 subcategory 문서만 좁혀서 매칭됩니다.
 2. **힌트 레벨 하드 필터**: `config/field_level_mapping.json`의 매핑을 기준으로, 현재 힌트 레벨과 관련 없는 필드는 애초에 프롬프트에 포함하지 않습니다. 문제 메타데이터(A) 조회에 쓰는 `ProblemContextSelector`와 동일한 "정책 파일이 필드 노출을 정하고 코드는 조립만" 패턴입니다.
 
-시맨틱 유사도 랭킹 단계는 없습니다 — 벡터DB를 쓰지 않기로 하면서 "검색 랭킹"이라는 개념 자체가 없어졌습니다. 실제 조회 코드(`RagRetrievalService` 구현체)는 아직 작성 전입니다.
+시맨틱 유사도 랭킹 단계는 없습니다 — 벡터DB를 쓰지 않기로 하면서 "검색 랭킹"이라는 개념 자체가 없어졌습니다. 실제 조회 코드는 `backend/.../rag/KnowledgeBaseRagRetrievalService.java`로 구현·테스트 완료 상태입니다.
 
 ## 힌트 API 테스트
 
