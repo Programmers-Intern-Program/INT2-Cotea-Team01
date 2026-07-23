@@ -58,7 +58,7 @@ class KnowledgeBaseRagRetrievalServiceTest {
 
     @Test
     void returnsLevelAppropriateFieldsWhenTagMatches() {
-        List<RagChunk> chunks = service.retrieve(List.of("bfs"), 2, "질문");
+        List<RagChunk> chunks = service.retrieve(List.of("bfs"), List.of(), 2, "질문");
 
         assertThat(chunks).hasSize(1);
         RagChunk chunk = chunks.get(0);
@@ -70,23 +70,144 @@ class KnowledgeBaseRagRetrievalServiceTest {
 
     @Test
     void returnsEmptyListWhenTagDoesNotMatch() {
-        List<RagChunk> chunks = service.retrieve(List.of("dfs"), 2, "질문");
+        List<RagChunk> chunks = service.retrieve(List.of("dfs"), List.of(), 2, "질문");
 
         assertThat(chunks).isEmpty();
     }
 
     @Test
     void returnsEmptyListWhenNoFieldIsExposedAtThisLevel() {
-        List<RagChunk> chunks = service.retrieve(List.of("bfs"), 1, "질문");
+        List<RagChunk> chunks = service.retrieve(List.of("bfs"), List.of(), 1, "질문");
 
         assertThat(chunks).isEmpty();
     }
 
     @Test
     void returnsEmptyListWhenTagsIsEmpty() {
-        List<RagChunk> chunks = service.retrieve(List.of(), 2, "질문");
+        List<RagChunk> chunks = service.retrieve(List.of(), List.of(), 2, "질문");
 
         assertThat(chunks).isEmpty();
+    }
+
+    /**
+     * subcategory가 있는 category(예: dp)는 문제가 subcategory를 지정하지 않으면
+     * 그 category에 속한 문서를 전부 포함한다 — 하위호환 기본값.
+     */
+    @Test
+    void returnsAllSubcategoryDocsWhenProblemDoesNotSpecifySubcategory(@TempDir Path tempDir) throws IOException {
+        KnowledgeBaseRagRetrievalService multiService = serviceWithMultiSubcategoryFixture(tempDir);
+
+        List<RagChunk> chunks = multiService.retrieve(List.of("dp"), List.of(), 2, "질문");
+
+        assertThat(chunks).hasSize(2);
+        assertThat(chunks).extracting(RagChunk::getContent)
+                .anyMatch(content -> content.contains("DP 일반 정의"));
+        assertThat(chunks).extracting(RagChunk::getContent)
+                .anyMatch(content -> content.contains("DP 냅색 정의"));
+    }
+
+    /** 문제가 subcategory를 지정하면, 일치하는 subcategory 문서만 좁혀서 반환한다. */
+    @Test
+    void returnsOnlyMatchingSubcategoryDocWhenProblemSpecifiesIt(@TempDir Path tempDir) throws IOException {
+        KnowledgeBaseRagRetrievalService multiService = serviceWithMultiSubcategoryFixture(tempDir);
+
+        List<RagChunk> chunks = multiService.retrieve(List.of("dp"), List.of("dp_knapsack"), 2, "질문");
+
+        assertThat(chunks).hasSize(1);
+        assertThat(chunks.get(0).getContent()).contains("DP 냅색 정의");
+    }
+
+    private KnowledgeBaseRagRetrievalService serviceWithMultiSubcategoryFixture(Path tempDir) throws IOException {
+        String docsJson = """
+                [
+                  {
+                    "category": "dp",
+                    "subcategory": "dp_general",
+                    "language": "ko",
+                    "definition": "DP 일반 정의",
+                    "when_to_use": "DP 일반 사용 시점",
+                    "java_specific_notes": "DP 일반 자바 팁",
+                    "applicable_scale": "DP 일반 적용 규모"
+                  },
+                  {
+                    "category": "dp",
+                    "subcategory": "dp_knapsack",
+                    "language": "ko",
+                    "definition": "DP 냅색 정의",
+                    "when_to_use": "DP 냅색 사용 시점",
+                    "java_specific_notes": "DP 냅색 자바 팁",
+                    "applicable_scale": "DP 냅색 적용 규모"
+                  }
+                ]
+                """;
+        Files.createDirectories(tempDir.resolve("build"));
+        Files.createDirectories(tempDir.resolve("config"));
+        Files.writeString(tempDir.resolve("build/knowledge_base_docs.json"), docsJson);
+        Files.writeString(tempDir.resolve("config/field_level_mapping.json"), FIELD_LEVEL_MAPPING_JSON);
+
+        CoteaProperties properties = new CoteaProperties();
+        properties.getRag().setEnabled(true);
+        properties.getRag().setDirectory(tempDir.toString());
+        return new KnowledgeBaseRagRetrievalService(properties, objectMapper);
+    }
+
+    /** often_combined_with는 [{ref, note}] 배열이라, 매칭 레벨에서 사람이 읽을 문장으로 렌더링돼야 한다. */
+    @Test
+    void rendersOftenCombinedWithAsReadableTextWhenLevelMatches(@TempDir Path tempDir) throws IOException {
+        KnowledgeBaseRagRetrievalService multiService = serviceWithOftenCombinedWithFixture(tempDir);
+
+        List<RagChunk> chunks = multiService.retrieve(List.of("bfs"), List.of(), 3, "질문");
+
+        assertThat(chunks).hasSize(1);
+        String content = chunks.get(0).getContent();
+        assertThat(content).contains("priority_queue", "다익스트라에서 결합", "simulation_grid", "격자 확산 문제에서 결합");
+    }
+
+    /** definition은 Lv2에만, often_combined_with는 Lv3에만 노출되므로 Lv2 조회 시 후자는 섞이면 안 된다. */
+    @Test
+    void excludesOftenCombinedWithWhenLevelDoesNotMatch(@TempDir Path tempDir) throws IOException {
+        KnowledgeBaseRagRetrievalService multiService = serviceWithOftenCombinedWithFixture(tempDir);
+
+        List<RagChunk> chunks = multiService.retrieve(List.of("bfs"), List.of(), 2, "질문");
+
+        assertThat(chunks).hasSize(1);
+        String content = chunks.get(0).getContent();
+        assertThat(content).contains("BFS 정의");
+        assertThat(content).doesNotContain("priority_queue", "함께 자주 쓰이는 기법");
+    }
+
+    private KnowledgeBaseRagRetrievalService serviceWithOftenCombinedWithFixture(Path tempDir) throws IOException {
+        String docsJson = """
+                [
+                  {
+                    "category": "bfs",
+                    "subcategory": null,
+                    "language": "ko",
+                    "definition": "BFS 정의",
+                    "often_combined_with": [
+                      { "ref": "priority_queue", "note": "다익스트라에서 결합" },
+                      { "ref": "simulation_grid", "note": "격자 확산 문제에서 결합" }
+                    ]
+                  }
+                ]
+                """;
+        String mappingJson = """
+                {
+                  "knowledge_base": {
+                    "definition": { "related_levels": [2] },
+                    "often_combined_with": { "related_levels": [3] }
+                  }
+                }
+                """;
+        Files.createDirectories(tempDir.resolve("build"));
+        Files.createDirectories(tempDir.resolve("config"));
+        Files.writeString(tempDir.resolve("build/knowledge_base_docs.json"), docsJson);
+        Files.writeString(tempDir.resolve("config/field_level_mapping.json"), mappingJson);
+
+        CoteaProperties properties = new CoteaProperties();
+        properties.getRag().setEnabled(true);
+        properties.getRag().setDirectory(tempDir.toString());
+        return new KnowledgeBaseRagRetrievalService(properties, objectMapper);
     }
 
     /**
@@ -100,7 +221,7 @@ class KnowledgeBaseRagRetrievalServiceTest {
         properties.getRag().setDirectory("../rag");
         KnowledgeBaseRagRetrievalService realService = new KnowledgeBaseRagRetrievalService(properties, objectMapper);
 
-        List<RagChunk> chunks = realService.retrieve(List.of("bfs"), 2, "이 문제는 어떻게 접근해야 하나요?");
+        List<RagChunk> chunks = realService.retrieve(List.of("bfs"), List.of(), 2, "이 문제는 어떻게 접근해야 하나요?");
 
         chunks.forEach(chunk ->
                 System.out.println("[" + chunk.getSource() + "/" + chunk.getChunkId() + "] " + chunk.getContent()));

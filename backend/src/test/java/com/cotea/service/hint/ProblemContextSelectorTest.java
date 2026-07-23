@@ -72,6 +72,44 @@ class ProblemContextSelectorTest {
         assertThat(context.path("fields").isEmpty()).isTrue();
     }
 
+    @Test
+    void extractsSubcategoriesWhenPresent() throws IOException {
+        JsonNode problem = objectMapper.readTree("""
+                {
+                  "classification": {
+                    "primary": [
+                      { "tag": "dp", "subcategory": ["dp_knapsack"] },
+                      { "tag": "math", "subcategory": [] }
+                    ]
+                  }
+                }
+                """);
+
+        assertThat(selector.extractSubcategories(problem)).containsExactly("dp_knapsack");
+    }
+
+    @Test
+    void extractsMultipleSubcategoriesFromOneTag() throws IOException {
+        JsonNode problem = objectMapper.readTree("""
+                {
+                  "classification": {
+                    "primary": [
+                      { "tag": "string", "subcategory": ["string_general", "string_pattern_basic"] }
+                    ]
+                  }
+                }
+                """);
+
+        assertThat(selector.extractSubcategories(problem)).containsExactly("string_general", "string_pattern_basic");
+    }
+
+    @Test
+    void extractsEmptySubcategoriesWhenNoneSpecified() throws IOException {
+        JsonNode problem = sampleProblem();
+
+        assertThat(selector.extractSubcategories(problem)).isEmpty();
+    }
+
     private HintRequest wrongAnswerReasonRequest(String submissionResult, String buttonId) {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);
