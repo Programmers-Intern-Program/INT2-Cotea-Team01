@@ -12,6 +12,7 @@ cotea:
     directory: ../rag/problems
   off-topic:
     enabled: true
+    llm-route-enabled: true   # ambiguous FREE_TEXT만 OpenAI로 RELATED/OFF_TOPIC 판별
   kakao:
     client-id: 여기에_카카오_REST_API_KEY
     # client-secret: 여기에_카카오_CLIENT_SECRET # 카카오 앱에서 사용 설정한 경우만

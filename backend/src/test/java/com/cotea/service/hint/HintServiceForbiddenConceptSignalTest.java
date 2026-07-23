@@ -152,6 +152,7 @@ class HintServiceForbiddenConceptSignalTest {
                 new HintSelfReviewService(llmClient, objectMapper, questionResolver),
                 new ForbiddenConceptLlmSignal(),
                 new OffTopicQuestionClassifier(),
+                Mockito.mock(OffTopicRouteLlmClassifier.class),
                 null,
                 new ConceptGapClassifier(),
                 new ConceptGapLlmSignal(),
@@ -172,7 +173,7 @@ class HintServiceForbiddenConceptSignalTest {
         request.setHintLevel(1);
         request.setQuestionType("BUTTON");
         request.setButtonId("hint_level_1");
-        request.setLanguage("java");
+        request.setLanguage("Java");
         return request;
     }
 }

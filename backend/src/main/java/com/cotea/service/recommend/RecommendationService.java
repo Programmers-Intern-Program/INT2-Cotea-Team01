@@ -119,17 +119,144 @@ public class RecommendationService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public RecommendationResponse recommendByTags(List<String> tags, List<Integer> excludeProblemIds, Integer limit) {
+        Set<String> sourceTags = resolveTags(tags);
+        if (sourceTags.isEmpty()) {
+            return RecommendationResponse.builder()
+                    .sourceTags(List.of())
+                    .recommendations(List.of())
+                    .build();
+        }
+
+        Set<Integer> excluded = excludeProblemIds == null
+                ? Set.of()
+                : excludeProblemIds.stream().collect(Collectors.toSet());
+
+        Map<Integer, List<ProblemClassificationEntity>> byProblem =
+                classificationRepository.findByTagIn(sourceTags).stream()
+                        .filter(c -> !excluded.contains(c.getProblemId()))
+                        .collect(Collectors.groupingBy(ProblemClassificationEntity::getProblemId));
+
+        if (byProblem.isEmpty()) {
+            log.info("[RECOMMEND_BY_TAGS] tags={} 후보 없음", sourceTags);
+            return RecommendationResponse.builder()
+                    .sourceTags(new ArrayList<>(sourceTags))
+                    .recommendations(List.of())
+                    .build();
+        }
+
+        Map<Integer, ProblemEntity> candidateProblems = problemMetaRepository
+                .findAllById(byProblem.keySet()).stream()
+                .collect(Collectors.toMap(ProblemEntity::getProblemId, p -> p));
+
+        int max = (limit == null || limit <= 0) ? DEFAULT_LIMIT : limit;
+        List<RecommendedProblem> recommendations = byProblem.entrySet().stream()
+                .map(e -> toCandidate(e.getKey(), e.getValue(), candidateProblems.get(e.getKey()),
+                        Set.of(), null, UserRecommendationProfile.empty()))
+                .filter(c -> c != null)
+                .sorted(Comparator
+                        .comparingInt(Candidate::score).reversed()
+                        .thenComparing(c -> c.level == null ? Integer.MAX_VALUE : c.level)
+                        .thenComparingInt(c -> c.problemId))
+                .limit(max)
+                .map(this::toDto)
+                .collect(Collectors.toList());
+
+        log.info("[RECOMMEND_BY_TAGS] tags={} candidates={} returned={}",
+                sourceTags, byProblem.size(), recommendations.size());
+
+        return RecommendationResponse.builder()
+                .sourceTags(new ArrayList<>(sourceTags))
+                .recommendations(recommendations)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public RecommendationResponse recommendUnderPracticed(
+            Map<String, Long> practicedTagCounts,
+            List<Integer> excludeProblemIds,
+            Integer limit
+    ) {
+        Set<Integer> excluded = excludeProblemIds == null
+                ? Set.of()
+                : excludeProblemIds.stream().collect(Collectors.toSet());
+        Map<String, Long> practiceCounts = practicedTagCounts == null ? Map.of() : practicedTagCounts;
+
+        List<ProblemClassificationEntity> availableRows = classificationRepository.findAll().stream()
+                .filter(c -> c.getTag() != null && !c.getTag().isBlank())
+                .filter(c -> !excluded.contains(c.getProblemId()))
+                .collect(Collectors.toList());
+
+        if (availableRows.isEmpty()) {
+            log.info("[RECOMMEND_UNDER_PRACTICED] 추천 가능한 후보 없음");
+            return RecommendationResponse.builder()
+                    .sourceTags(List.of())
+                    .recommendations(List.of())
+                    .build();
+        }
+
+        Set<String> targetTags = availableRows.stream()
+                .map(ProblemClassificationEntity::getTag)
+                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .stream()
+                .sorted(Comparator
+                        .comparingLong((String tag) -> practiceCounts.getOrDefault(tag, 0L))
+                        .thenComparing(tag -> tag))
+                .limit(Math.max(limitOrDefault(limit) * 2L, DEFAULT_LIMIT))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        Map<Integer, List<ProblemClassificationEntity>> byProblem = availableRows.stream()
+                .filter(c -> targetTags.contains(c.getTag()))
+                .collect(Collectors.groupingBy(ProblemClassificationEntity::getProblemId));
+
+        Map<Integer, ProblemEntity> candidateProblems = problemMetaRepository
+                .findAllById(byProblem.keySet()).stream()
+                .collect(Collectors.toMap(ProblemEntity::getProblemId, p -> p));
+
+        int max = limitOrDefault(limit);
+        List<RecommendedProblem> recommendations = byProblem.entrySet().stream()
+                .map(e -> toDiversityCandidate(e.getKey(), e.getValue(), candidateProblems.get(e.getKey()), practiceCounts))
+                .filter(c -> c != null)
+                .sorted(Comparator
+                        .comparingLong((Candidate c) -> c.practicedCount)
+                        .thenComparing(c -> c.level == null ? Integer.MAX_VALUE : c.level)
+                        .thenComparingInt(c -> c.problemId))
+                .limit(max)
+                .map(this::toDiversityDto)
+                .collect(Collectors.toList());
+
+        log.info("[RECOMMEND_UNDER_PRACTICED] targetTags={} candidates={} returned={}",
+                targetTags, byProblem.size(), recommendations.size());
+
+        return RecommendationResponse.builder()
+                .sourceTags(new ArrayList<>(targetTags))
+                .recommendations(recommendations)
+                .build();
+    }
+
     private Set<String> resolveSourceTags(ProblemEntity source, List<String> tagOverride) {
         if (tagOverride != null && !tagOverride.isEmpty()) {
-            return tagOverride.stream()
-                    .filter(t -> t != null && !t.isBlank())
-                    .map(String::trim)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return resolveTags(tagOverride);
         }
         return source.getClassifications().stream()
                 .map(ProblemClassificationEntity::getTag)
                 .filter(t -> t != null && !t.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<String> resolveTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return Set.of();
+        }
+        return tags.stream()
+                .filter(t -> t != null && !t.isBlank())
+                .map(String::trim)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private int limitOrDefault(Integer limit) {
+        return (limit == null || limit <= 0) ? DEFAULT_LIMIT : limit;
     }
 
     private Candidate toCandidate(int candidateId,
@@ -194,6 +321,34 @@ public class RecommendationService {
         return bonus;
     }
 
+    private Candidate toDiversityCandidate(int candidateId,
+                                           List<ProblemClassificationEntity> rows,
+                                           ProblemEntity problem,
+                                           Map<String, Long> practicedTagCounts) {
+        if (problem == null || rows.isEmpty()) {
+            return null;
+        }
+
+        String primaryTag = rows.stream()
+                .map(ProblemClassificationEntity::getTag)
+                .filter(tag -> tag != null && !tag.isBlank())
+                .min(Comparator
+                        .comparingLong((String tag) -> practicedTagCounts.getOrDefault(tag, 0L))
+                        .thenComparing(tag -> tag))
+                .orElse(null);
+        if (primaryTag == null) {
+            return null;
+        }
+
+        Candidate candidate = new Candidate();
+        candidate.problemId = candidateId;
+        candidate.problem = problem;
+        candidate.primaryTag = primaryTag;
+        candidate.level = parseLevel(problem.getLevel());
+        candidate.practicedCount = practicedTagCounts.getOrDefault(primaryTag, 0L);
+        return candidate;
+    }
+
     private int levelScore(Integer candidateLevel, Integer sourceLevel) {
         if (candidateLevel == null || sourceLevel == null) {
             return 2;
@@ -213,12 +368,33 @@ public class RecommendationService {
                 .problemId(c.problemId)
                 .title(c.problem.getTitle())
                 .level(c.problem.getLevel())
-                .url(c.problem.getUrl())
+                .url(problemUrl(c.problem))
                 .tag(c.primaryTag)
                 .subcategory(c.matchedSubcategory)
                 .recommendationType(type)
                 .reason(reason(type, c))
                 .build();
+    }
+
+    private RecommendedProblem toDiversityDto(Candidate c) {
+        return RecommendedProblem.builder()
+                .problemId(c.problemId)
+                .title(c.problem.getTitle())
+                .level(c.problem.getLevel())
+                .url(problemUrl(c.problem))
+                .tag(c.primaryTag)
+                .recommendationType("UNDER_PRACTICED_ALGORITHM")
+                .reason("다양한 유형을 넓히기 위해 추천했어요.")
+                .build();
+    }
+
+    private String problemUrl(ProblemEntity problem) {
+        if (problem.getUrl() != null && !problem.getUrl().isBlank()) {
+            return problem.getUrl();
+        }
+        return "https://school.programmers.co.kr/learn/courses/30/lessons/"
+                + problem.getProblemId()
+                + "?language=java";
     }
 
     private String recommendationType(Candidate c) {
@@ -232,29 +408,18 @@ public class RecommendationService {
     }
 
     private String reason(String type, Candidate c) {
-        String tag = displayTag(c.primaryTag);
-        String base;
         switch (type) {
             case "SIMILAR_PATTERN":
-                base = String.format(
-                        "지금 문제와 같은 %s 유형(%s)이라, 같은 접근 방식을 한 번 더 연습하기 좋아요.",
-                        tag, c.matchedSubcategory);
-                break;
+                return c.weakTagHit
+                        ? "최근 자주 막혔던 풀이 흐름을 다시 연습하기 좋아요."
+                        : "비슷한 사고 과정을 한 번 더 연습하기 좋아요.";
             case "BASIC_CONCEPT_REVIEW":
-                base = String.format(
-                        "%s 개념을 더 쉬운 난이도(%s)에서 연습할 수 있는 문제예요. 부담 없이 복습한 뒤 원래 문제로 돌아오세요.",
-                        tag, c.problem.getLevel());
-                break;
+                return "조금 더 부담 없는 난이도에서 비슷한 사고 과정을 복습할 수 있는 문제예요.";
             default:
-                base = String.format(
-                        "같은 %s 유형 문제예요. 접근 방식을 반복해서 익혀볼 수 있어요.",
-                        tag);
-                break;
+                return c.weakTagHit
+                        ? "최근 자주 막혔던 풀이 흐름을 다시 연습하기 좋아요."
+                        : "최근 막혔던 접근 방식을 한 번 더 연습해볼 수 있는 문제예요.";
         }
-        if (c.weakTagHit) {
-            return base + " 최근 이 유형에서 자주 막혀서 연습용으로 추천했어요.";
-        }
-        return base;
     }
 
     private static String tagSubKey(String tag, String subcategory) {
@@ -333,6 +498,7 @@ public class RecommendationService {
         private Integer sourceLevel;
         private int score;
         private boolean weakTagHit;
+        private long practicedCount;
 
         private int score() {
             return score;

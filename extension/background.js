@@ -200,6 +200,9 @@ function buildHintRequestBody(message) {
   if (hintRequest.stage === 'WRONG_ANSWER' && hintRequest.submissionResult) {
     body.submissionResult = hintRequest.submissionResult;
   }
+  if (Object.prototype.hasOwnProperty.call(hintRequest, 'solved')) {
+    body.solved = hintRequest.solved;
+  }
 
   return body;
 }
@@ -309,6 +312,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.problemTitle) {
           nextState.problemTitle = message.problemTitle;
         }
+        if (Object.prototype.hasOwnProperty.call(message, 'solved')) {
+          nextState.problemSolved = message.solved;
+        }
         if (message.language) {
           nextState.currentLanguage = message.language;
           nextState.languageNotSupported = !/java/i.test(message.language);
@@ -323,9 +329,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GRADING_RESULT') {
     // detectedAt으로 매번 값이 바뀌게 해서, 연속으로 같은 결과(예: 오답→오답)가
     // 나와도 storage.onChanged가 매번 발생하도록 한다.
+    // passed는 엄격히 true일 때만 true로 취급한다 (Boolean(message.passed)는
+    // "false" 같은 문자열도 truthy라 true가 돼버림). 통과(passed=true)했으면
+    // failureReason은 항상 null로 강제해 저장 데이터가 자기모순되지 않게 한다.
+    const passed = message.passed === true;
     setLocalState({
       gradingResult: {
-        passed: Boolean(message.passed),
+        passed,
+        failureReason: passed ? null : (message.failureReason ?? null),
         source: message.source === 'run' ? 'run' : 'submit',
         problemId: message.problemId ?? null,
         detectedAt: Date.now(),
@@ -342,6 +353,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       currentLanguage: 'Java',
       problemId: null,
       problemTitle: null,
+      problemSolved: null,
       apiConfig: DEFAULT_API_CONFIG,
       authState: null,
       codeDirty: false,
@@ -362,6 +374,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.error('[Cotea] 카카오 로그인 실패:', error.message);
         sendResponse({ ok: false, error: error.message });
       });
+    return true;
+  }
+
+  if (message.type === 'GET_KAKAO_REDIRECT_URI') {
+    try {
+      sendResponse({ ok: true, redirectUri: getKakaoRedirectUri() });
+    } catch (error) {
+      sendResponse({ ok: false, error: error.message });
+    }
+    return false;
+  }
+
+  if (message.type === 'LAUNCH_KAKAO_AUTH') {
+    launchWebAuthFlow({
+      url: message.authorizeUrl,
+      interactive: true,
+    })
+      .then((redirectUrl) => sendResponse({ ok: true, redirectUrl }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
@@ -452,6 +483,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           if (response.problemTitle) {
             nextState.problemTitle = response.problemTitle;
+          }
+          if (Object.prototype.hasOwnProperty.call(response, 'solved')) {
+            nextState.problemSolved = response.solved;
           }
           chrome.storage.local.set(nextState);
 

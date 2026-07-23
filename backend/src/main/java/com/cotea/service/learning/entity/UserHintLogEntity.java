@@ -9,7 +9,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -38,8 +37,7 @@ public class UserHintLogEntity {
     @Column(name = "problem_level", length = 50)
     private String problemLevel;
 
-    @Lob
-    @Column(name = "problem_tags")
+    @Column(name = "problem_tags", columnDefinition = "TEXT")
     private String problemTags;
 
     @Column(length = 30, nullable = false)
@@ -54,8 +52,7 @@ public class UserHintLogEntity {
     @Column(name = "button_id", length = 80)
     private String buttonId;
 
-    @Lob
-    @Column(name = "question_text")
+    @Column(name = "question_text", columnDefinition = "TEXT")
     private String questionText;
 
     @Column(name = "submission_result", length = 50)
@@ -81,8 +78,7 @@ public class UserHintLogEntity {
     @Column(name = "prompt_policy_version", length = 30)
     private String promptPolicyVersion;
 
-    @Lob
-    @Column(name = "selected_problem_fields")
+    @Column(name = "selected_problem_fields", columnDefinition = "TEXT")
     private String selectedProblemFields;
 
     @Column(length = 30)
@@ -90,6 +86,9 @@ public class UserHintLogEntity {
 
     @Column(name = "llm_provider", length = 50)
     private String llmProvider;
+
+    @Column
+    private Boolean solved;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -116,6 +115,7 @@ public class UserHintLogEntity {
         log.selectedProblemFields = command.selectedProblemFields();
         log.route = command.route();
         log.llmProvider = command.llmProvider();
+        log.solved = command.solved();
         return log;
     }
 
@@ -144,7 +144,8 @@ public class UserHintLogEntity {
             String promptPolicyVersion,
             String selectedProblemFields,
             String route,
-            String llmProvider
+            String llmProvider,
+            Boolean solved
     ) {
     }
 }

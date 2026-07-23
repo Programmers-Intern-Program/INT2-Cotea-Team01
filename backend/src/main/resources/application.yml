@@ -25,6 +25,7 @@ cotea:
     directory: ${COTEA_RAG_DIR:../rag}
   off-topic:
     enabled: true
+    llm-route-enabled: true
   kakao:
     client-id: ${KAKAO_CLIENT_ID:}
     client-secret: ${KAKAO_CLIENT_SECRET:}

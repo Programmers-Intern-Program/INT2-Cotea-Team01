@@ -55,10 +55,15 @@ const state = {
   latestCode: '',
   problemId: null,
   problemTitle: null,
+  problemSolved: null,
   stage: null,
   hintLevel: null,
   submissionResult: null,
+  submissionResultAutoDetected: false,
   lastMessageStage: null,
+  // 대화가 진행 중인 상태에서 다른 문제로 이동한 걸 감지했을 때, 사용자가
+  // "이전 대화 유지"/"새로 시작"을 고르기 전까지 여기에 새 문제 id를 잠깐 들고 있는다.
+  pendingProblemSwitch: null,
   apiConfig: { ...DEFAULT_API_CONFIG },
   syncing: false,
   codeDirty: false,
@@ -73,6 +78,8 @@ const state = {
   loginSuccess: false,
   loginNotice: '',
   reportNotice: '',
+  reportLoading: false,
+  reportData: null,
 };
 
 const PROGRAMMERS_HOST = 'school.programmers.co.kr';
@@ -133,6 +140,7 @@ function buildHintRequest(questionText, chipLabel) {
     stage,
     userCode: state.latestCode || '',
     language: state.currentLanguage || 'Unknown',
+    solved: state.problemSolved === true ? true : (stage === 'WRONG_ANSWER' ? false : null),
     conversationHistory: buildConversationHistory(),
   };
 
@@ -188,6 +196,9 @@ async function syncPageContext() {
     if (response && response.problemTitle) {
       state.problemTitle = response.problemTitle;
     }
+    if (response && Object.prototype.hasOwnProperty.call(response, 'solved')) {
+      state.problemSolved = response.solved;
+    }
   } catch (_error) {
     // 프로그래머스 탭이 없으면 무시
   }
@@ -211,6 +222,112 @@ function applyAuthState(authState) {
   state.loggedIn = Boolean(authState && authState.accessToken);
   const user = authState && authState.user ? authState.user : null;
   state.kakaoNickname = user && user.nickname ? user.nickname : null;
+}
+
+function normalizeApiBaseUrl() {
+  return (state.apiConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+}
+
+function randomState() {
+  const values = new Uint32Array(4);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => value.toString(16)).join('');
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const errorBody = await response.json();
+      if (errorBody.message) {
+        detail = `: ${errorBody.message}`;
+      }
+    } catch (_error) {
+      // ignore parse errors
+    }
+    throw new Error(`로그인 API 요청 실패: ${response.status}${detail}`);
+  }
+  return response.json();
+}
+
+async function getKakaoRedirectUri() {
+  if (chrome.identity && typeof chrome.identity.getRedirectURL === 'function') {
+    return chrome.identity.getRedirectURL('kakao');
+  }
+  const response = await sendRuntimeMessage({ type: 'GET_KAKAO_REDIRECT_URI' });
+  if (!response || !response.ok || !response.redirectUri) {
+    throw new Error((response && response.error) || '카카오 리다이렉트 URI를 만들지 못했습니다.');
+  }
+  return response.redirectUri;
+}
+
+function launchKakaoAuthDirect(authorizeUrl) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow({ url: authorizeUrl, interactive: true }, (redirectUrl) => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+      if (!redirectUrl) {
+        reject(new Error('카카오 로그인 리다이렉트 URL을 받지 못했습니다.'));
+        return;
+      }
+      resolve(redirectUrl);
+    });
+  });
+}
+
+async function launchKakaoAuth(authorizeUrl) {
+  if (chrome.identity && typeof chrome.identity.launchWebAuthFlow === 'function') {
+    return launchKakaoAuthDirect(authorizeUrl);
+  }
+  const response = await sendRuntimeMessage({ type: 'LAUNCH_KAKAO_AUTH', authorizeUrl });
+  if (!response || !response.ok || !response.redirectUrl) {
+    throw new Error((response && response.error) || '카카오 로그인 창을 열지 못했습니다.');
+  }
+  return response.redirectUrl;
+}
+
+async function loginWithKakaoApi() {
+  const baseUrl = normalizeApiBaseUrl();
+  const redirectUri = await getKakaoRedirectUri();
+  const stateToken = randomState();
+
+  const authorize = await fetchJson(
+    `${baseUrl}/api/auth/kakao/authorize-url?redirectUri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(stateToken)}`
+  );
+  const redirectUrl = await launchKakaoAuth(authorize.authorizeUrl);
+  const redirected = new URL(redirectUrl);
+
+  const error = redirected.searchParams.get('error');
+  if (error) {
+    throw new Error(`카카오 로그인이 취소되었거나 실패했습니다: ${error}`);
+  }
+  if (redirected.searchParams.get('state') !== stateToken) {
+    throw new Error('카카오 로그인 state 값이 일치하지 않습니다.');
+  }
+
+  const code = redirected.searchParams.get('code');
+  if (!code) {
+    throw new Error('카카오 인가 코드를 받지 못했습니다.');
+  }
+
+  const auth = await fetchJson(`${baseUrl}/api/auth/kakao`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirectUri }),
+  });
+  const authState = {
+    accessToken: auth.accessToken,
+    tokenType: auth.tokenType || 'Bearer',
+    expiresIn: auth.expiresIn,
+    expiresAt: Date.now() + Number(auth.expiresIn || 0) * 1000,
+    user: auth.user || null,
+  };
+  await chrome.storage.local.set({ authState });
+  return authState;
 }
 
 function buildAvatarMarkup(glow, variant = 'chat') {
@@ -367,8 +484,9 @@ function renderRecommendationCards(recommendations) {
     <div class="rec-list">
       ${recommendations.map((rec) => {
         const level = rec.level ? `<span class="rec-card-level">${escapeHtml(rec.level)}</span>` : '';
+        const url = rec.url || buildProgrammersProblemUrl(rec.problemId);
         return `
-          <button type="button" class="rec-card" data-rec-url="${escapeHtml(rec.url || '')}" data-rec-problem="${escapeHtml(String(rec.problemId || ''))}">
+          <button type="button" class="rec-card" data-rec-url="${escapeHtml(url)}" data-rec-problem="${escapeHtml(String(rec.problemId || ''))}">
             <span class="rec-card-head">${escapeHtml(rec.title || '문제')} ${level}</span>
             ${rec.reason ? `<span class="rec-card-reason">${escapeHtml(rec.reason)}</span>` : ''}
           </button>
@@ -376,6 +494,13 @@ function renderRecommendationCards(recommendations) {
       }).join('')}
     </div>
   `;
+}
+
+function buildProgrammersProblemUrl(problemId) {
+  if (!problemId) {
+    return '';
+  }
+  return `https://school.programmers.co.kr/learn/courses/30/lessons/${encodeURIComponent(problemId)}?language=java`;
 }
 
 function renderBusyIndicator() {
@@ -402,6 +527,9 @@ function renderHeaderTitle() {
   if (!state.onProgrammers) {
     return '프로그래머스 문제';
   }
+  if (state.problemId && state.problemTitle) {
+    return `문제 #${state.problemId}: ${state.problemTitle}`;
+  }
   if (state.problemTitle) {
     return `프로그래머스 문제 - ${state.problemTitle}`;
   }
@@ -411,21 +539,21 @@ function renderHeaderTitle() {
   return '프로그래머스 문제';
 }
 
-function renderSyncLabel() {
-  if (!state.latestCode) {
-    return '코드 동기화 대기 중';
-  }
-  if (state.codeDirty) {
-    return '코드를 반영하려면 동기화 버튼을 눌러주세요!';
-  }
-  return '최신 코드 동기화 완료';
-}
-
-function renderSyncDotClass() {
+function renderSyncBadgeClass() {
   if (!state.latestCode) {
     return '';
   }
   return state.codeDirty ? 'dirty' : 'ok';
+}
+
+function renderSyncTooltip() {
+  if (!state.latestCode) {
+    return '아직 동기화된 코드가 없어요';
+  }
+  if (state.codeDirty) {
+    return '코드가 변경됐어요 · 동기화가 필요해요';
+  }
+  return '최신 코드와 동기화됐어요';
 }
 
 function renderComposerPlaceholder() {
@@ -496,7 +624,7 @@ function renderAccountButtonInner() {
 function renderProfileView() {
   return `
     <section class="login-view">
-      <div class="login-card">
+      <div class="login-card ${state.reportData ? 'login-card--report' : ''}">
         <div class="login-card-head">
           <p class="login-title">내 계정</p>
           <button type="button" id="login-close" class="login-close" aria-label="닫기">✕</button>
@@ -508,11 +636,86 @@ function renderProfileView() {
             <p class="profile-sub">카카오 계정으로 로그인됨</p>
           </div>
         </div>
-        <button type="button" id="report-button" class="report-button">리포트 보기</button>
+        <button type="button" id="report-button" class="report-button" ${state.reportLoading ? 'disabled' : ''}>
+          ${state.reportLoading ? '리포트 불러오는 중...' : '리포트 보기'}
+        </button>
         ${state.reportNotice ? `<p class="login-notice">${escapeHtml(state.reportNotice)}</p>` : ''}
+        ${state.reportData ? renderLearningReport(state.reportData) : ''}
         <button type="button" id="logout-button" class="logout-button">로그아웃</button>
       </div>
     </section>
+  `;
+}
+
+function renderLearningReport(report) {
+  const weaknessItems = renderReportCountItems(report.topWeaknessTypes);
+  const intentItems = renderReportCountItems(report.topIntents);
+  const tagItems = renderReportCountItems(report.topTags);
+  const insights = Array.isArray(report.insights) && report.insights.length > 0
+    ? report.insights.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
+    : '<li>아직 충분한 분석 데이터가 없습니다.</li>';
+  const reviewRecommendations = Array.isArray(report.reviewRecommendations) && report.reviewRecommendations.length > 0
+    ? renderRecommendationCards(report.reviewRecommendations)
+    : '<p class="report-empty">아직 복습 문제를 찾지 못했습니다. 질문 기록이 더 쌓이면 풀이 패턴에 맞춰 추천해드릴게요.</p>';
+  const diversityRecommendations = Array.isArray(report.diversityRecommendations) && report.diversityRecommendations.length > 0
+    ? renderRecommendationCards(report.diversityRecommendations)
+    : '<p class="report-empty">아직 다양성 추천 문제를 찾지 못했습니다. 더 많은 문제 데이터가 준비되면 추천해드릴게요.</p>';
+
+  return `
+    <section class="report-panel">
+      <div class="report-panel-head">
+        <div>
+          <p class="report-eyebrow">최근 ${escapeHtml(report.periodDays || 7)}일</p>
+          <h3>학습 리포트</h3>
+        </div>
+        <span class="report-count">${escapeHtml(report.totalHintCount || 0)}회</span>
+      </div>
+      <p class="report-summary">${escapeHtml(report.summary || '')}</p>
+      <div class="report-metrics">
+        <span>해결한 문제 ${escapeHtml(report.solvedProblemCount || 0)}개</span>
+        <span>AI 질문 ${escapeHtml(report.totalHintCount || 0)}회</span>
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">가장 자주 막힌 부분</p>
+        ${weaknessItems}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">자주 물어본 내용</p>
+        ${intentItems}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">자주 막힌 알고리즘</p>
+        ${tagItems}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">코칭 메모</p>
+        <ul class="report-insights">${insights}</ul>
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">복습 문제 추천</p>
+        ${reviewRecommendations}
+      </div>
+      <div class="report-section">
+        <p class="report-section-title">다양성 추천</p>
+        ${diversityRecommendations}
+      </div>
+    </section>
+  `;
+}
+
+function renderReportCountItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<p class="report-empty">아직 데이터가 없습니다.</p>';
+  }
+  return `
+    <div class="report-chip-list">
+      ${items.map((item) => `
+        <div class="report-chip">
+          <span>${escapeHtml(item.name || '')}</span>
+          <strong>${escapeHtml(item.count || 0)}회</strong>
+        </div>
+      `).join('')}
+    </div>
   `;
 }
 
@@ -530,6 +733,22 @@ function renderLoginFormView() {
           <span class="kakao-bubble-icon" aria-hidden="true"></span>
           ${state.loginPending ? '확인 중...' : '카카오로 시작하기'}
         </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderProblemSwitchView() {
+  const newProblemId = state.pendingProblemSwitch.problemId;
+  return `
+    <section class="login-view">
+      <div class="login-card">
+        <p class="login-title">다른 문제로 이동했어요</p>
+        <p class="login-desc">문제 #${escapeHtml(String(newProblemId))}(으)로 이동한 것 같아요. 지금까지의 대화를 이어서 쓸까요, 새로 시작할까요?</p>
+        <div class="problem-switch-actions">
+          <button type="button" id="problem-switch-keep" class="problem-switch-button keep">이전 대화 유지</button>
+          <button type="button" id="problem-switch-reset" class="problem-switch-button reset">새로 시작</button>
+        </div>
       </div>
     </section>
   `;
@@ -578,17 +797,18 @@ function renderShell() {
             <button type="button" id="account-button" class="header-action account-button ${state.showLogin ? 'active' : ''}" aria-label="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}" data-tooltip="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}">
               ${renderAccountButtonInner()}
             </button>
-            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers ? 'disabled' : ''}>
+            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="${escapeHtml(renderSyncTooltip())}" ${state.syncing || !state.onProgrammers || state.pendingProblemSwitch ? 'disabled' : ''}>
               <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
               </svg>
+              ${renderSyncBadgeClass() ? `<span class="sync-badge ${renderSyncBadgeClass()}"></span>` : ''}
             </button>
           </div>
         </header>
 
-        ${state.showLogin ? renderLoginView() : `
+        ${state.showLogin ? renderLoginView() : state.pendingProblemSwitch ? renderProblemSwitchView() : `
         <section class="cotea-chat-scroll" id="chat-scroll">
           ${state.messages.map(renderMessage).join('')}
           ${renderBusyIndicator()}
@@ -597,10 +817,6 @@ function renderShell() {
         <div class="cotea-bottom-shell">
           <div class="stage-row-wrap">
             ${renderStageSelector()}
-            <div class="sync-row">
-              <span class="sync-dot ${renderSyncDotClass()}"></span>
-              <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
-            </div>
           </div>
           ${renderHintLevelSelector()}
           ${renderSubmissionResultSelector()}
@@ -670,6 +886,16 @@ function bindEvents() {
   const kakaoLoginButton = document.getElementById('kakao-login-button');
   if (kakaoLoginButton) {
     kakaoLoginButton.addEventListener('click', handleKakaoLogin);
+  }
+
+  const problemSwitchKeepButton = document.getElementById('problem-switch-keep');
+  if (problemSwitchKeepButton) {
+    problemSwitchKeepButton.addEventListener('click', handleKeepConversationOnProblemSwitch);
+  }
+
+  const problemSwitchResetButton = document.getElementById('problem-switch-reset');
+  if (problemSwitchResetButton) {
+    problemSwitchResetButton.addEventListener('click', handleStartFreshOnProblemSwitch);
   }
 
   const reportButton = document.getElementById('report-button');
@@ -764,15 +990,17 @@ function handleStageSelect(value) {
   state.stage = value;
   state.hintLevel = null;
   state.submissionResult = null;
+  state.submissionResultAutoDetected = false;
   state.activeChip = null;
   state.input = '';
   renderShell();
 }
 
+const AUTO_DETECTABLE_SUBMISSION_RESULTS = new Set(['WRONG_ANSWER', 'TIME_LIMIT_EXCEEDED', 'RUNTIME_ERROR']);
+
 function applyGradingResult(gradingResult) {
-  // 1차 범위: 합/불만 자동 감지하고, TLE/런타임에러 세부 구분은 하지 않은 채
-  // 모든 불합격을 기본값 오답(WRONG_ANSWER)으로 취급한다 (report05 논의 참고).
-  // 이미 사용자가 시간초과/런타임에러로 직접 고쳐놓은 값은 재감지 시에도 덮어쓰지 않는다.
+  // 실패 시 오답/시간초과/런타임에러를 자동 판별해 submissionResult를 채운다.
+  // 이미 사용자가 직접 고쳐놓은 값은 재감지 시에도 덮어쓰지 않는다.
   if (!gradingResult || gradingResult.passed !== false) {
     return;
   }
@@ -795,11 +1023,16 @@ function applyGradingResult(gradingResult) {
   state.stage = 'WRONG_ANSWER';
   state.hintLevel = null;
   state.activeChip = null;
-  if (!state.submissionResult) {
-    state.submissionResult = 'WRONG_ANSWER';
+  // 이전 값이 없거나, 이전 값도 (사용자가 아니라) 자동 감지로 채워진 것이었다면
+  // 최신 감지 결과로 갱신한다. 사용자가 직접 고른 값만 보존 대상이다.
+  if (!state.submissionResult || state.submissionResultAutoDetected) {
+    const detected = gradingResult.failureReason;
+    state.submissionResult = AUTO_DETECTABLE_SUBMISSION_RESULTS.has(detected) ? detected : 'WRONG_ANSWER';
+    state.submissionResultAutoDetected = true;
   }
   const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
-  pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요` : `${sourceLabel} 자동 감지: 오답이에요`);
+  const resultLabel = SUBMISSION_RESULT_OPTIONS.find((o) => o.value === state.submissionResult)?.label ?? '오답';
+  pushStageDivider(alreadyInWrongAnswerFlow ? `${sourceLabel} 자동 감지: 다시 실패했어요 (${resultLabel})` : `${sourceLabel} 자동 감지: ${resultLabel}`);
   // 여기서 이미 구분선을 남겼으니, 바로 이어서 질문을 보내도 handleSend가
   // 상태 변화로 착각해 중복 구분선을 또 남기지 않도록 동기화해둔다.
   state.lastMessageStage = 'WRONG_ANSWER';
@@ -832,6 +1065,7 @@ function handleSubmissionResultSelect(value) {
     return;
   }
   state.submissionResult = value;
+  state.submissionResultAutoDetected = false;
   state.input = opt.whyQuestion;
   state.activeChip = opt.whyLabel;
   renderShell();
@@ -851,11 +1085,8 @@ async function handleKakaoLogin() {
   renderShell();
 
   try {
-    const response = await sendRuntimeMessage({ type: 'LOGIN_KAKAO' });
-    if (!response || !response.ok) {
-      throw new Error((response && response.error) || '카카오 로그인에 실패했습니다.');
-    }
-    applyAuthState(response.authState);
+    const authState = await loginWithKakaoApi();
+    applyAuthState(authState);
     state.loginPending = false;
     state.loginSuccess = true;
     state.loginNotice = `${state.kakaoNickname || '카카오 사용자'}님 환영합니다!`;
@@ -889,10 +1120,16 @@ async function handleLogout() {
   applyAuthState(null);
   state.showLogin = false;
   state.reportNotice = '';
+  state.reportData = null;
+  state.reportLoading = false;
   renderShell();
 }
 
 async function handleWeeklyReport() {
+  if (state.reportLoading) {
+    return;
+  }
+  state.reportLoading = true;
   state.reportNotice = '최근 7일 리포트를 불러오는 중입니다...';
   renderShell();
 
@@ -901,30 +1138,18 @@ async function handleWeeklyReport() {
     if (!response || !response.ok) {
       throw new Error((response && response.error) || '리포트를 불러오지 못했습니다.');
     }
-    state.reportNotice = formatWeeklyReport(response.report);
+    state.reportData = response.report;
+    state.reportNotice = '';
   } catch (error) {
     state.reportNotice = error.message;
+  } finally {
+    state.reportLoading = false;
   }
   renderShell();
 }
 
-function formatWeeklyReport(report) {
-  if (!report || !report.totalHintCount) {
-    return '최근 7일 동안 저장된 힌트 요청이 없습니다.';
-  }
-
-  const topWeakness = report.topWeaknessTypes && report.topWeaknessTypes[0]
-    ? `${report.topWeaknessTypes[0].name} ${report.topWeaknessTypes[0].count}회`
-    : '약점 데이터 없음';
-  const topTag = report.topTags && report.topTags[0]
-    ? `${report.topTags[0].name} ${report.topTags[0].count}회`
-    : '태그 데이터 없음';
-
-  return `최근 ${report.periodDays}일 힌트 ${report.totalHintCount}회 · 주요 약점: ${topWeakness} · 자주 막힌 태그: ${topTag}`;
-}
-
 async function handleSync() {
-  if (state.syncing || !state.onProgrammers) {
+  if (state.syncing || !state.onProgrammers || state.pendingProblemSwitch) {
     return;
   }
 
@@ -949,6 +1174,9 @@ async function handleSync() {
       }
       if (response.problemTitle) {
         state.problemTitle = response.problemTitle;
+      }
+      if (Object.prototype.hasOwnProperty.call(response, 'solved')) {
+        state.problemSolved = response.solved;
       }
       if (response.warning) {
         state.messages.push({
@@ -1157,27 +1385,81 @@ function queryActiveTab() {
   });
 }
 
+function hasActiveConversation() {
+  // 웰컴 메시지 하나만 있는 상태는 "아직 진행 중인 대화"로 치지 않는다 -
+  // 사용자가 실제로 입력을 하거나 상태를 고른 적이 있어야 잃을 게 있는 것.
+  return state.stage != null || state.messages.some((message) => message.role === 'user');
+}
+
+function applyProblemSwitch(newProblemId, resetConversation) {
+  state.problemId = newProblemId;
+  state.problemTitle = null;
+  state.pendingProblemSwitch = null;
+  if (resetConversation) {
+    state.messages = [];
+    state.stage = null;
+    state.hintLevel = null;
+    state.submissionResult = null;
+    state.activeChip = null;
+    state.input = '';
+    state.lastMessageStage = null;
+    ensureWelcomeMessage();
+  }
+  renderShell();
+  syncPageContext().then(() => renderShell());
+}
+
+function handleKeepConversationOnProblemSwitch() {
+  if (!state.pendingProblemSwitch) {
+    return;
+  }
+  applyProblemSwitch(state.pendingProblemSwitch.problemId, false);
+}
+
+function handleStartFreshOnProblemSwitch() {
+  if (!state.pendingProblemSwitch) {
+    return;
+  }
+  applyProblemSwitch(state.pendingProblemSwitch.problemId, true);
+}
+
 function refreshActiveTabStatus() {
   queryActiveTab().then((activeTab) => {
     const onProgrammers = isTabOnProgrammers(activeTab);
     const urlProblemId = onProgrammers ? parseProblemIdFromUrl(activeTab.url) : null;
-    // 다른 문제로 이동한 직후엔 storage/state에 남아있던 "이전 문제" 제목이
-    // content.js의 CODE_CHANGED 감지(최대 1초 지연)가 오기 전까지 그대로 노출되던
-    // 문제를 고치기 위해, URL만으로 번호를 먼저 갱신하고 제목은 비워둔다.
-    const navigatedToDifferentProblem = onProgrammers && urlProblemId != null && urlProblemId !== state.problemId;
+    const navigatedToDifferentProblem = onProgrammers && urlProblemId != null && urlProblemId !== state.problemId
+      && (!state.pendingProblemSwitch || state.pendingProblemSwitch.problemId !== urlProblemId);
+    // 확인 다이얼로그를 띄운 채로 사용자가 원래 보던 문제로 되돌아가면
+    // 더 이상 물어볼 이유가 없으니 조용히 취소한다.
+    const backToOriginalProblem = state.pendingProblemSwitch && urlProblemId === state.problemId;
 
     let shouldRender = false;
 
     if (onProgrammers !== state.onProgrammers) {
       state.onProgrammers = onProgrammers;
+      // 확인 대기 중에 프로그래머스를 완전히 벗어나면, renderShell()이 onProgrammers
+      // 여부와 무관하게 pendingProblemSwitch를 최우선으로 그려버려서 오프사이트
+      // 안내/비활성화 화면 대신 엉뚱하게 확인 카드가 계속 떠 있게 된다. 물어볼
+      // 대상 페이지 자체를 벗어났으니 조용히 취소한다.
+      if (!onProgrammers && state.pendingProblemSwitch) {
+        state.pendingProblemSwitch = null;
+      }
       shouldRender = true;
     }
 
     if (navigatedToDifferentProblem) {
-      state.problemId = urlProblemId;
-      state.problemTitle = null;
+      // 대화가 없는 상태(웰컴 메시지뿐이거나 방금 초기화됨)라면 잃을 게 없으니
+      // 굳이 확인받지 않고 바로 반영한다. 확인이 필요한 건 진행 중인 대화가
+      // 있을 때뿐이다.
+      if (hasActiveConversation()) {
+        state.pendingProblemSwitch = { problemId: urlProblemId };
+      } else {
+        applyProblemSwitch(urlProblemId, false);
+      }
       shouldRender = true;
-      syncPageContext().then(() => renderShell());
+    } else if (backToOriginalProblem) {
+      state.pendingProblemSwitch = null;
+      shouldRender = true;
     }
 
     if (shouldRender) {
@@ -1193,6 +1475,9 @@ async function initialize() {
     state.latestCode = response && response.latestCode ? response.latestCode : '';
     state.problemId = response && response.problemId != null ? response.problemId : null;
     state.problemTitle = response && response.problemTitle ? response.problemTitle : null;
+    state.problemSolved = response && Object.prototype.hasOwnProperty.call(response, 'problemSolved')
+      ? response.problemSolved
+      : null;
     state.apiConfig = { ...DEFAULT_API_CONFIG, ...((response && response.apiConfig) || {}) };
     applyAuthState(response && response.authState ? response.authState : null);
     state.codeDirty = Boolean(response && response.codeDirty);
@@ -1251,11 +1536,29 @@ async function initialize() {
     }
 
     if (changes.problemId) {
-      state.problemId = changes.problemId.newValue ?? null;
+      const newProblemId = changes.problemId.newValue ?? null;
+      // content.js가 CODE_CHANGED로 새 문제 id를 실시간 보고할 때도(코드 에디터를
+      // 스치기만 해도 발생) refreshActiveTabStatus()의 URL 기반 감지와 동일하게
+      // 진행 중인 대화가 있으면 확인을 받는다. 여기서 직접 덮어써버리면 그
+      // 확인 절차를 완전히 우회하게 된다.
+      if (newProblemId != null && newProblemId !== state.problemId
+        && (!state.pendingProblemSwitch || state.pendingProblemSwitch.problemId !== newProblemId)) {
+        if (hasActiveConversation()) {
+          state.pendingProblemSwitch = { problemId: newProblemId };
+        } else {
+          applyProblemSwitch(newProblemId, false);
+        }
+      } else if (newProblemId === state.problemId) {
+        state.pendingProblemSwitch = null;
+      }
     }
 
-    if (changes.problemTitle) {
+    if (changes.problemTitle && !state.pendingProblemSwitch) {
       state.problemTitle = changes.problemTitle.newValue || null;
+    }
+
+    if (changes.problemSolved) {
+      state.problemSolved = changes.problemSolved.newValue ?? null;
     }
 
     if (changes.apiConfig) {
