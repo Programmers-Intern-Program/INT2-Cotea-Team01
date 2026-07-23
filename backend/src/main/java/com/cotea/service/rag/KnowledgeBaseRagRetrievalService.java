@@ -81,7 +81,9 @@ public class KnowledgeBaseRagRetrievalService implements RagRetrievalService {
             if (!isLevelIncluded(fieldLevelMapping.path(fieldName).path("related_levels"), hintLevel)) {
                 continue;
             }
-            String value = doc.path(fieldName).asText("");
+            String value = "often_combined_with".equals(fieldName)
+                    ? renderOftenCombinedWith(doc.path(fieldName))
+                    : doc.path(fieldName).asText("");
             if (value.isBlank()) {
                 continue;
             }
@@ -91,6 +93,26 @@ public class KnowledgeBaseRagRetrievalService implements RagRetrievalService {
             sb.append(value);
         }
         return sb.toString();
+    }
+
+    /** often_combined_with는 [{ref, note}] 배열이라 asText()로는 못 읽어서, 사람이 읽을 문장으로 직접 직렬화한다. */
+    private String renderOftenCombinedWith(JsonNode node) {
+        if (!node.isArray() || node.isEmpty()) {
+            return "";
+        }
+        List<String> parts = new ArrayList<>();
+        for (JsonNode item : node) {
+            String ref = item.path("ref").asText("");
+            String note = item.path("note").asText("");
+            if (ref.isBlank() || note.isBlank()) {
+                continue;
+            }
+            parts.add(ref + "(" + note + ")");
+        }
+        if (parts.isEmpty()) {
+            return "";
+        }
+        return "함께 자주 쓰이는 기법: " + String.join(", ", parts);
     }
 
     private boolean isLevelIncluded(JsonNode relatedLevels, int hintLevel) {

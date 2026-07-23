@@ -17,6 +17,10 @@
     "applicable_scale": {
       "purpose": "이 접근이 통하는/안 통하는 입력 규모 기준 — '명백히 잘못된 접근' 예외 판단의 근거",
       "related_levels": [2, 4]
+    },
+    "often_combined_with": {
+      "purpose": "구현 시 함께 결합되는 자료구조/기법 안내 (예: bfs + priority_queue)",
+      "related_levels": [3]
     }
   },
 

@@ -4,9 +4,11 @@
 >
 > 대조한 파일: `rag/data_source/knowledge_base/bfs.json`, `dp_general.json`, `stack.json`(예시 3건), `rag/scripts/regenerate_chunks.py`, `rag/build/knowledge_base_docs.json`, `rag/config/field_level_mapping.json`, `backend/.../rag/KnowledgeBaseRagRetrievalService.java`, `backend/.../rag/RagChunk.java`, `backend/.../rag/KnowledgeBaseRagRetrievalServiceTest.java`, `backend/.../hint/ProblemContextSelector.java`(태그 추출부).
 
-## 1. 결론부터 — 실제로 살아있는 필드는 4개뿐이다
+## 1. 결론부터 — 실제로 살아있는 필드는 몇 개인가
 
-`data_source`의 문서 하나에는 최대 9개 필드(`doc_id`, `category`, `subcategory`, `hint_level_scope`, `language`, `content.definition`, `content.when_to_use`, `content.java_specific_notes`, `applicable_scale`, `distinguishing_from`, `code_signals`, `often_combined_with` — 사실 12개)가 있지만, **사용자에게 실제로 전달되는(LLM 프롬프트에 들어가는) 값은 `definition`, `when_to_use`, `java_specific_notes`, `applicable_scale` 4개뿐이다.** 나머지는 매칭에 쓰이거나(`category`), 빌드 단계에서 버려지거나(`doc_id`, `hint_level_scope`), 빌드 결과물엔 남지만 조회 코드가 아예 읽지 않는다(`subcategory`, `distinguishing_from`, `code_signals`, `often_combined_with`, `language`).
+> **2026-07-23 갱신**: 아래 "4개뿐"이라는 결론은 이 문서를 처음 쓴 시점 기준이다. 그 뒤 `subcategory`(매칭, §3)와 `often_combined_with`(프롬프트 노출, §4)가 추가로 살아났고, `distinguishing_from`은 런타임이 아니라 문제 데이터 작성 시점의 참고 자료로 쓰기로 결정했다(§4). `code_signals`는 검토 끝에 지금은 쓰지 않기로 명시적으로 결정했다(§5-1).
+
+`data_source`의 문서 하나에는 최대 9개 필드(`doc_id`, `category`, `subcategory`, `hint_level_scope`, `language`, `content.definition`, `content.when_to_use`, `content.java_specific_notes`, `applicable_scale`, `distinguishing_from`, `code_signals`, `often_combined_with` — 사실 12개)가 있다. 사용자에게 실제로 전달되는(LLM 프롬프트에 들어가는) 값은 `definition`, `when_to_use`, `java_specific_notes`, `applicable_scale`, `often_combined_with` 5개다. `category`/`subcategory`는 매칭에 쓰이고, `doc_id`/`hint_level_scope`는 빌드 단계에서 버려지고, `language`는 메타데이터로만 남는다. `distinguishing_from`은 빌드 결과물엔 남지만 런타임 조회 코드는 읽지 않는다 — 대신 문제 데이터(`rag/problems/*.json`) 작성 시점에 `approach.alternativeApproaches` 후보를 고르는 참고 자료로 쓴다(`docs/problem-data-authoring-rules.md` §5 표). `code_signals`는 빌드 결과물엔 남지만 지금은 어떤 코드도 읽지 않기로 결정했다(§5-1).
 
 ## 2. 필드별 생애주기 (data_source → build → 런타임 소비)
 
@@ -21,9 +23,9 @@
 | `content.when_to_use` | ✅ | ✅ (flatten) | ✅ | 살아있음 — `related_levels: [2, 3]` |
 | `content.java_specific_notes` | ✅ | ✅ (flatten) | ✅ | 살아있음 — `related_levels: [3, 4]` |
 | `applicable_scale` | ✅ (선택) | ✅ (있으면) | ✅ | 살아있음 — `related_levels: [2, 4]` |
-| `distinguishing_from` | ✅ (선택) | ✅ (있으면) | ❌ | **빌드엔 남지만 프롬프트에 전혀 안 실림** (§4 참고) |
-| `code_signals` | ✅ (선택) | ✅ (있으면) | ❌ | 위와 동일 |
-| `often_combined_with` | ✅ (선택) | ✅ (있으면) | ❌ | 위와 동일 |
+| `distinguishing_from` | ✅ (선택) | ✅ (있으면) | ❌ (의도적) | **런타임엔 안 실림 — 대신 문제 데이터 작성 시 `alternativeApproaches` 후보 참고용** (§4 참고) |
+| `code_signals` | ✅ (선택) | ✅ (있으면) | ❌ (의도적) | **지금은 쓰지 않기로 결정** — 데이터는 유지, 소비 코드 없음 (§5-1 참고) |
+| `often_combined_with` | ✅ (선택) | ✅ (있으면) | ✅ (2026-07-23 이후) | 살아있음 — `related_levels: [3]`, `KnowledgeBaseRagRetrievalService`가 `[{ref,note}]`를 사람이 읽을 문장으로 렌더링 |
 
 ## 3. `subcategory` 매칭 — 2026-07-23 구현 완료
 
@@ -40,11 +42,15 @@ if (category == null || !tags.contains(category)) continue;
 
 **현재 동작**: 문제가 `classification.primary[].subcategory`를 지정하지 않으면(빈 값) 해당 category의 모든 subcategory 문서가 그대로 매칭된다(하위호환). 지정하면 일치하는 subcategory 문서만 좁혀서 매칭된다 — "general" 문서를 자동으로 끼워 넣는 로직은 없고, 필요하면 문제 쪽에서 명시적으로 지정해야 한다. `rag/README.md`의 "1:1 매칭" 서술도 이 동작을 반영해 갱신했다.
 
-## 4. `distinguishing_from` / `code_signals` / `often_combined_with`는 LLM이 못 본다
+## 4. `distinguishing_from` / `code_signals` / `often_combined_with` — 2026-07-23 결정 사항
 
-`buildContent()`는 오직 `field_level_mapping.json`의 `knowledge_base` 키 목록(`definition`, `when_to_use`, `java_specific_notes`, `applicable_scale` 4개)만 순회해서 값을 이어붙인다. 세 필드 다 이 4개 목록에 없으므로, 아무리 잘 써도 최종 프롬프트에 한 글자도 안 들어간다. (이전 세션에서 30개 문서에 이 필드들을 채우는 작업 자체는 완료됐지만, "소비하는 코드"는 아직 없다는 뜻이다 — 데이터 존재와 실제 반영은 별개다.)
+> 이 절은 원래 "세 필드 다 LLM이 못 본다"는 버그를 기록했었다. 검토 끝에 세 필드를 각각 다르게 처리하기로 결정했다. 결론만 아래로 갱신하고, 판단 과정은 §5-1(code_signals)에 남겨둔다.
 
-**math 작성 시 권장**: 이 3개 필드는 당장 사용자에게 영향을 주지 않으니, 시간이 부족하면 후순위로 두거나 생략해도 기능상 문제는 없다. 다만 나중에 이 필드들을 소비하는 코드가 추가될 걸 대비해 스키마 형태(참조 대상 `ref`가 실제 존재하는 `doc_id`/`category`를 가리키는 것 등)는 맞춰두는 게 안전하다.
+**`often_combined_with` — 런타임 소비로 전환.** `KnowledgeBaseRagRetrievalService.buildContent()`가 `field_level_mapping.json`의 `knowledge_base` 키 목록을 순회하는 건 여전하지만, 이제 `often_combined_with`도 그 목록에 있고(`related_levels: [3]`), 배열이라 `asText()`로 못 읽는 문제는 전용 렌더러(`renderOftenCombinedWith()`)로 해결했다 — `[{ref, note}]`를 `"함께 자주 쓰이는 기법: ref1(note1), ref2(note2)"` 형태의 문장으로 직렬화해서 다른 필드들과 같은 방식으로 이어붙인다. Lv3("구현 힌트")에서만 노출된다.
+
+**`distinguishing_from` — 런타임엔 안 씀, 문제 데이터 작성 시점의 참고 자료로 전환.** 이 필드를 그대로 프롬프트에 얹는 방안을 검토했으나, Lv2 정책의 "사용자가 비교를 요청한 경우에만 대안 접근을 짧게 언급"이라는 조건을 강제할 장치가 없어 정책 위반(요청 안 했는데 비교를 먼저 꺼내는 것) 위험이 있다고 판단해 보류했다. 대신 `docs/problem-data-authoring-rules.md`의 `approach.alternativeApproaches`(이미 존재하고 이미 Lv2에 이름만 노출되는 안전한 필드) 작성 규칙에 "해당 category/subcategory KB 문서의 `distinguishing_from[].ref`를 후보로 참고할 것"이라는 지침을 추가했다. `signal`(비교 설명문)은 작성자가 후보를 판단하는 근거로만 쓰이고, 런타임에 어떤 형태로도 노출되지 않는다.
+
+**`code_signals` — 지금은 쓰지 않기로 결정.** §5-1 참고.
 
 ## 5. 그래서 `math.json` 작성 시 실제로 신경 써야 할 것 (우선순위 순)
 
@@ -55,7 +61,9 @@ if (category == null || !tags.contains(category)) continue;
 3. **`applicable_scale`** — "이 접근이 통하는/안 통하는 입력 규모" 기준. math는 다른 카테고리와 달리 "입력 규모"보다 "정수 오버플로우, 부동소수점 오차, 나눗셈 나머지 처리" 같은 수치적 한계가 더 중요할 수 있다 — 이 필드의 의미를 그대로 가져오되, math 특성에 맞게 재해석해서 쓸 것.
 4. **`subcategory`** — 이제 §3에 따라 실제로 필터링에 쓰이니, 나눌 경우 문제 데이터 쪽에서 해당 subcategory를 명시해야 그 문서만 좁혀서 매칭된다는 점을 감안해서 설계할 것. `math.json`은 프로그래머스 수학 문제 분포 조사 전이라 우선 `null`(단일 문서)로 시작했고, 필요해지면 재검토한다.
 5. **`doc_id`, `hint_level_scope`** — 완전 미사용이라 채워도 기능에 영향 없다. 다만 스키마 일관성(다른 29개 문서와 형태 통일)을 위해 관례대로 채워두는 걸 권장한다 (`doc_id`는 `category`와 동일하게, `hint_level_scope`는 `[2, 3]` 같은 기존 문서들의 패턴을 따름).
-6. **`distinguishing_from` / `code_signals` / `often_combined_with`** — §4에 따라 지금은 기능적으로 죽어있는 필드. 시간 여유가 있을 때만.
+6. **`often_combined_with`** — §4에 따라 이제 Lv3에 실제로 노출된다. math와 자주 결합되는 게 있다면(예: bruteforcing, dp) 채워둘 것.
+7. **`distinguishing_from`** — 런타임엔 안 쓰이지만, `math` 문제 데이터를 작성할 때 `approach.alternativeApproaches` 후보를 고르는 참고 자료로 쓰인다(§4). 채워두면 나중에 math 문제를 만들 때 유용하다.
+8. **`code_signals`** — §5-1에 따라 지금은 쓰지 않기로 결정된 필드. 시간 여유가 있을 때만.
 
 ## 5-1. `code_signals`의 구조적 한계 — 매칭 안 됨은 "안 씀"의 증거가 아니다
 
@@ -75,5 +83,5 @@ if (category == null || !tags.contains(category)) continue;
 
 ## 7. 이번 조사에서 함께 드러난, 이 문서 범위를 벗어나는 별도 이슈
 
-- `subcategory` 필터링은 2026-07-23에 구현 완료됐다(§3). `distinguishing_from`/`code_signals`/`often_combined_with` 미소비(§4)는 여전히 남아있는 별개 이슈로, `math` 작성 규칙과 무관하게 **RAG 검색 품질 자체의 개선 여지**다. 코드 변경이 필요한 사안이라 이 규칙 문서 범위 밖으로 남겨둔다.
+- `subcategory` 필터링(§3)과 `often_combined_with` 프롬프트 노출(§4)은 2026-07-23에 구현 완료됐다. `distinguishing_from`은 런타임 대신 문제 데이터 작성 시 참고 자료로 쓰기로 결정했다(§4, `docs/problem-data-authoring-rules.md` 반영 완료). `code_signals`는 §5-1의 한계를 근거로 지금은 쓰지 않기로 결정했다 — 데이터는 유지하되 소비 코드는 만들지 않는다.
 - `docs/vector-db-schema.md`가 통제 어휘 개수(20→21) 외에 실제 구현과 어긋나는 부분이 더 있는지는 아직 별도로 점검하지 않았다.

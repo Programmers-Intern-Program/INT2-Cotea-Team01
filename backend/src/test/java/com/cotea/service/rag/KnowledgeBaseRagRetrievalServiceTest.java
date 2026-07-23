@@ -151,6 +151,65 @@ class KnowledgeBaseRagRetrievalServiceTest {
         return new KnowledgeBaseRagRetrievalService(properties, objectMapper);
     }
 
+    /** often_combined_with는 [{ref, note}] 배열이라, 매칭 레벨에서 사람이 읽을 문장으로 렌더링돼야 한다. */
+    @Test
+    void rendersOftenCombinedWithAsReadableTextWhenLevelMatches(@TempDir Path tempDir) throws IOException {
+        KnowledgeBaseRagRetrievalService multiService = serviceWithOftenCombinedWithFixture(tempDir);
+
+        List<RagChunk> chunks = multiService.retrieve(List.of("bfs"), List.of(), 3, "질문");
+
+        assertThat(chunks).hasSize(1);
+        String content = chunks.get(0).getContent();
+        assertThat(content).contains("priority_queue", "다익스트라에서 결합", "simulation_grid", "격자 확산 문제에서 결합");
+    }
+
+    /** definition은 Lv2에만, often_combined_with는 Lv3에만 노출되므로 Lv2 조회 시 후자는 섞이면 안 된다. */
+    @Test
+    void excludesOftenCombinedWithWhenLevelDoesNotMatch(@TempDir Path tempDir) throws IOException {
+        KnowledgeBaseRagRetrievalService multiService = serviceWithOftenCombinedWithFixture(tempDir);
+
+        List<RagChunk> chunks = multiService.retrieve(List.of("bfs"), List.of(), 2, "질문");
+
+        assertThat(chunks).hasSize(1);
+        String content = chunks.get(0).getContent();
+        assertThat(content).contains("BFS 정의");
+        assertThat(content).doesNotContain("priority_queue", "함께 자주 쓰이는 기법");
+    }
+
+    private KnowledgeBaseRagRetrievalService serviceWithOftenCombinedWithFixture(Path tempDir) throws IOException {
+        String docsJson = """
+                [
+                  {
+                    "category": "bfs",
+                    "subcategory": null,
+                    "language": "ko",
+                    "definition": "BFS 정의",
+                    "often_combined_with": [
+                      { "ref": "priority_queue", "note": "다익스트라에서 결합" },
+                      { "ref": "simulation_grid", "note": "격자 확산 문제에서 결합" }
+                    ]
+                  }
+                ]
+                """;
+        String mappingJson = """
+                {
+                  "knowledge_base": {
+                    "definition": { "related_levels": [2] },
+                    "often_combined_with": { "related_levels": [3] }
+                  }
+                }
+                """;
+        Files.createDirectories(tempDir.resolve("build"));
+        Files.createDirectories(tempDir.resolve("config"));
+        Files.writeString(tempDir.resolve("build/knowledge_base_docs.json"), docsJson);
+        Files.writeString(tempDir.resolve("config/field_level_mapping.json"), mappingJson);
+
+        CoteaProperties properties = new CoteaProperties();
+        properties.getRag().setEnabled(true);
+        properties.getRag().setDirectory(tempDir.toString());
+        return new KnowledgeBaseRagRetrievalService(properties, objectMapper);
+    }
+
     /**
      * 테스트 픽스처가 아니라 실제 rag/ 폴더 데이터를 읽어서 눈으로 확인하기 위한 테스트.
      * ./gradlew test --tests "...KnowledgeBaseRagRetrievalServiceTest" --info 로 실행하면 콘솔에서 내용을 볼 수 있다.
