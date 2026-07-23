@@ -78,14 +78,29 @@ class ProblemContextSelectorTest {
                 {
                   "classification": {
                     "primary": [
-                      { "tag": "dp", "subcategory": "dp_knapsack" },
-                      { "tag": "math" }
+                      { "tag": "dp", "subcategory": ["dp_knapsack"] },
+                      { "tag": "math", "subcategory": [] }
                     ]
                   }
                 }
                 """);
 
         assertThat(selector.extractSubcategories(problem)).containsExactly("dp_knapsack");
+    }
+
+    @Test
+    void extractsMultipleSubcategoriesFromOneTag() throws IOException {
+        JsonNode problem = objectMapper.readTree("""
+                {
+                  "classification": {
+                    "primary": [
+                      { "tag": "string", "subcategory": ["string_general", "string_pattern_basic"] }
+                    ]
+                  }
+                }
+                """);
+
+        assertThat(selector.extractSubcategories(problem)).containsExactly("string_general", "string_pattern_basic");
     }
 
     @Test

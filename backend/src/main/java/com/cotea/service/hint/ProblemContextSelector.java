@@ -41,7 +41,9 @@ public class ProblemContextSelector {
     }
 
     /**
-     * classification.primary[].subcategory 중 값이 있는 것만 모은다.
+     * classification.primary[].subcategory(배열)에 있는 값을 전부 모은다.
+     * 한 tag가 여러 subcategory에 걸칠 수 있어 배열이다 (예: "string" 태그가
+     * ["string_general", "string_pattern_basic"] 둘 다에 걸칠 수 있음).
      * 비어있으면(문제가 subcategory를 지정하지 않았으면) RAG 조회 쪽에서 해당 category의
      * 모든 subcategory 문서를 그대로 포함하는 기존 동작을 유지한다(하위호환).
      */
@@ -50,8 +52,14 @@ public class ProblemContextSelector {
         JsonNode primary = problem.path("classification").path("primary");
         if (primary.isArray()) {
             primary.forEach(item -> {
-                if (item.hasNonNull("subcategory")) {
-                    subcategories.add(item.get("subcategory").asText());
+                JsonNode subcategoryNode = item.path("subcategory");
+                if (subcategoryNode.isArray()) {
+                    subcategoryNode.forEach(sc -> {
+                        String text = sc.asText("");
+                        if (!text.isBlank()) {
+                            subcategories.add(text);
+                        }
+                    });
                 }
             });
         }
