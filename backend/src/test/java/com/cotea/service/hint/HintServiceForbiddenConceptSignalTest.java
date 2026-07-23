@@ -152,6 +152,7 @@ class HintServiceForbiddenConceptSignalTest {
                 new HintSelfReviewService(llmClient, objectMapper, questionResolver),
                 new ForbiddenConceptLlmSignal(),
                 new OffTopicQuestionClassifier(),
+                Mockito.mock(OffTopicRouteLlmClassifier.class),
                 null,
                 new ConceptGapClassifier(),
                 new ConceptGapLlmSignal(),
