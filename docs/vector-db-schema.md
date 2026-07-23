@@ -1,7 +1,8 @@
 # 코티(Cotea) 벡터DB 스키마 — RAG 지식 베이스 (v0.1)
 
 > "RAG를 위한 데이터 준비" 대화에서 논의된 내용을 기준으로 정리. AI팀과의 협의 내용이 더 나오면 갱신 필요.
-> 문제별 메타데이터(A)는 관계형 DB 대상이라 여기 포함하지 않음 — ERD 참고. 이 문서는 일반 지식 베이스(B)와 `common_pitfalls` 컬렉션만 다룸.
+> 문제별 메타데이터(A)는 관계형 DB 대상이라 여기 포함하지 않음 — ERD 참고. 이 문서는 일반 지식 베이스(B)만 다룸.
+> (2026-07-23: `common_pitfalls` 컬렉션은 백엔드에 한 번도 연결된 적이 없어 데이터·빌드 스크립트·매핑을 전부 제거했다. 아래 "컬렉션 2" 서술은 삭제했다.)
 
 ## 왜 벡터 DB인가
 
@@ -49,18 +50,6 @@
 
 ---
 
-## 컬렉션 2: common_pitfalls (자바 흔한 실수, Level 4 전용)
-
-| 필드                | 타입   | 설명                                                             |
-| ------------------- | ------ | ---------------------------------------------------------------- |
-| pitfall_id          | string | 고유 ID                                                          |
-| mistake_description | string | 실수 설명 (예: 정수 오버플로우, `equals` vs `==`, O(N²) 함정 등) |
-| detection_signal    | string | 코드에서 이 실수를 식별할 수 있는 신호 (Level 4 코드 리뷰용)     |
-
-카테고리 특정적이지 않은 **cross-category** 컬렉션 — 특정 알고리즘 태그에 종속되지 않고 자바 언어 자체의 흔한 실수를 다룸.
-
----
-
 ## 검색 전략 (matchStrategy)
 
 ```
@@ -70,8 +59,6 @@ exact_category_then_semantic
 1. `PROBLEM_CLASSIFICATION`의 `tag`/`subcategory`로 **정확히 일치**하는 문서만 1차 필터링
 2. 그 안에서 사용자 질문과의 **시맨틱(임베딩 유사도) 검색**으로 최종 문서 선정
 3. `hint_level_scope`가 현재 요청의 `hintLevel`을 포함하지 않는 문서는 제외
-
-`common_pitfalls`는 카테고리 필터 없이, Level 4 요청일 때만 별도로 검색 대상에 포함.
 
 ---
 
@@ -94,5 +81,4 @@ exact_category_then_semantic
 ## 남은 TBD
 
 1. 벡터 DB 제품 선택 (Pinecone / pgvector / Weaviate 등)
-2. `common_pitfalls`가 Level 4 로직에 실제로 어떻게 통합되는지 (AI팀과 협의 예정 항목 중 하나로 남아있음)
-3. `knowledge_base` 문서 작성 우선순위 — 20개 카테고리 중 어떤 것부터 채울지
+2. `knowledge_base` 문서 작성 우선순위 — 20개 카테고리 중 어떤 것부터 채울지
