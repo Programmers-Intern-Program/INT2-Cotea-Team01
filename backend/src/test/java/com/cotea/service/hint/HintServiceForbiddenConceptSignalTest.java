@@ -11,12 +11,9 @@ import com.cotea.service.learning.LearningLogService;
 import com.cotea.service.learning.UserHintLogRepository;
 import com.cotea.service.learning.WeaknessClassifier;
 import com.cotea.service.policy.PromptPolicyLoader;
-import com.cotea.service.problem.ProblemMetaMapper;
-import com.cotea.service.problem.ProblemMetaRepository;
 import com.cotea.service.problem.ProblemMetaService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -29,8 +26,7 @@ import org.mockito.Mockito;
  * 신뢰할 수 없는 검증 방법이다. 대신 {@link LlmClient}를 스텁으로 교체해 마커가 포함된
  * 응답을 강제로 주입하고, 그 결과 재검토가 실제로 호출되는지를 직접 확인한다.
  *
- * <p>DB(ProblemMetaRepository)는 Mockito로 findById를 빈 값으로 만들어, 파일 기반 폴백
- * (rag/problems/1829.json)을 타도록 한다.
+ * <p>문제 메타는 테스트 안에서 직접 주입해 로컬 파일/DB 상태와 무관하게 검증한다.
  */
 class HintServiceForbiddenConceptSignalTest {
 
@@ -52,13 +48,10 @@ class HintServiceForbiddenConceptSignalTest {
     private ObjectMapper objectMapper;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         objectMapper = new ObjectMapper();
-        ProblemMetaRepository problemMetaRepository = Mockito.mock(ProblemMetaRepository.class);
-        Mockito.when(problemMetaRepository.findById(1829)).thenReturn(Optional.empty());
-        problemMetaService = new ProblemMetaService(
-                new CoteaProperties(), objectMapper, problemMetaRepository, new ProblemMetaMapper(objectMapper)
-        );
+        problemMetaService = Mockito.mock(ProblemMetaService.class);
+        Mockito.when(problemMetaService.load(1829)).thenReturn(sampleProblemMeta());
     }
 
     @Test
@@ -175,5 +168,29 @@ class HintServiceForbiddenConceptSignalTest {
         request.setButtonId("hint_level_1");
         request.setLanguage("Java");
         return request;
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode sampleProblemMeta() throws Exception {
+        return objectMapper.readTree("""
+                {
+                  "problemId": 1829,
+                  "source": {
+                    "title": "카카오프렌즈 컬러링북",
+                    "level": "Lv2"
+                  },
+                  "classification": {
+                    "primary": [
+                      {
+                        "tag": "dfs",
+                        "subcategory": "grid"
+                      }
+                    ],
+                    "difficultyReason": "연결된 영역을 빠짐없이 확인해야 한다."
+                  },
+                  "approach": {
+                    "keyInsight": "같은 색으로 연결된 칸들을 하나의 영역으로 바라본다."
+                  }
+                }
+                """);
     }
 }
