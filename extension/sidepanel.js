@@ -417,21 +417,21 @@ function renderHeaderTitle() {
   return '프로그래머스 문제';
 }
 
-function renderSyncLabel() {
-  if (!state.latestCode) {
-    return '코드 동기화 대기 중';
-  }
-  if (state.codeDirty) {
-    return '코드를 반영하려면 동기화 버튼을 눌러주세요!';
-  }
-  return '최신 코드 동기화 완료';
-}
-
-function renderSyncDotClass() {
+function renderSyncBadgeClass() {
   if (!state.latestCode) {
     return '';
   }
   return state.codeDirty ? 'dirty' : 'ok';
+}
+
+function renderSyncTooltip() {
+  if (!state.latestCode) {
+    return '아직 동기화된 코드가 없어요';
+  }
+  if (state.codeDirty) {
+    return '코드가 변경됐어요 · 동기화가 필요해요';
+  }
+  return '최신 코드와 동기화됐어요';
 }
 
 function renderComposerPlaceholder() {
@@ -600,12 +600,13 @@ function renderShell() {
             <button type="button" id="account-button" class="header-action account-button ${state.showLogin ? 'active' : ''}" aria-label="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}" data-tooltip="${state.loggedIn ? escapeHtml(state.kakaoNickname || '내 계정') : '로그인'}">
               ${renderAccountButtonInner()}
             </button>
-            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="코드 동기화" ${state.syncing || !state.onProgrammers || state.pendingProblemSwitch ? 'disabled' : ''}>
+            <button type="button" id="sync-button" class="header-action sync-button ${state.syncing ? 'syncing' : ''}" aria-label="코드 동기화" data-tooltip="${escapeHtml(renderSyncTooltip())}" ${state.syncing || !state.onProgrammers || state.pendingProblemSwitch ? 'disabled' : ''}>
               <svg class="sync-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
               </svg>
+              ${renderSyncBadgeClass() ? `<span class="sync-badge ${renderSyncBadgeClass()}"></span>` : ''}
             </button>
           </div>
         </header>
@@ -619,10 +620,6 @@ function renderShell() {
         <div class="cotea-bottom-shell">
           <div class="stage-row-wrap">
             ${renderStageSelector()}
-            <div class="sync-row">
-              <span class="sync-dot ${renderSyncDotClass()}"></span>
-              <span class="sync-label ${state.codeDirty ? 'dirty' : ''}">${escapeHtml(renderSyncLabel())}</span>
-            </div>
           </div>
           ${renderHintLevelSelector()}
           ${renderSubmissionResultSelector()}
