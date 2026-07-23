@@ -43,6 +43,7 @@ public class HintService {
     private final OffTopicLlmRouter offTopicLlmRouter;
     private final ConceptGapClassifier conceptGapClassifier;
     private final ConceptGapLlmSignal conceptGapLlmSignal;
+    private final FatalApproachLlmSignal fatalApproachLlmSignal;
     private final CoteaProperties coteaProperties;
     private final LearningLogService learningLogService;
 
@@ -104,9 +105,13 @@ public class HintService {
         List<RagChunk> ragChunks = ragRetrievalService.retrieve(tags, hintLevel, question);
 
         boolean llmSignalApplicable = conceptGapLlmSignal.isApplicable(request);
+        boolean fatalApproachApplicable = fatalApproachLlmSignal.isApplicable(request, problem);
         String systemPrompt = promptAssembler.buildSystemPrompt(policy, hintLevel, request);
         if (llmSignalApplicable) {
             systemPrompt = systemPrompt + conceptGapLlmSignal.instruction();
+        }
+        if (fatalApproachApplicable) {
+            systemPrompt = systemPrompt + fatalApproachLlmSignal.instruction();
         }
         if (hintLevel == 1) {
             systemPrompt = systemPrompt + forbiddenConceptLlmSignal.instruction();
@@ -149,6 +154,13 @@ public class HintService {
         } else {
             responseText = rawText;
         }
+        boolean fatalApproach = false;
+        if (fatalApproachApplicable) {
+            FatalApproachLlmSignal.Parsed fatalParsed = fatalApproachLlmSignal.parse(responseText);
+            responseText = fatalParsed.text();
+            fatalApproach = fatalParsed.fatalApproach().orElse(false);
+            responseText = fatalApproachLlmSignal.ensureWarningPrefix(responseText, fatalApproach);
+        }
         Set<String> selfReportedForbiddenConcepts = Set.of();
         if (hintLevel == 1) {
             ForbiddenConceptLlmSignal.Parsed forbiddenParsed = forbiddenConceptLlmSignal.parse(responseText);
@@ -162,6 +174,9 @@ public class HintService {
         boolean suggestConceptDrill = conceptGap || llmConceptGap;
         log.info("[CONCEPT_GAP] problemId={} rule={} llm={} suggest={}",
                 request.getProblemId(), conceptGap, llmConceptGap, suggestConceptDrill);
+        if (fatalApproachApplicable) {
+            log.info("[FATAL_APPROACH] problemId={} fatal={}", request.getProblemId(), fatalApproach);
+        }
 
         HintResponse response = HintResponse.builder()
                 .responseText(responseText)

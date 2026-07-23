@@ -156,6 +156,7 @@ class HintServiceForbiddenConceptSignalTest {
                 null,
                 new ConceptGapClassifier(),
                 new ConceptGapLlmSignal(),
+                new FatalApproachLlmSignal(),
                 new CoteaProperties(),
                 new LearningLogService(
                         Mockito.mock(JwtTokenProvider.class),
@@ -173,6 +174,7 @@ class HintServiceForbiddenConceptSignalTest {
         request.setHintLevel(1);
         request.setQuestionType("BUTTON");
         request.setButtonId("hint_level_1");
+        request.setLanguage("Java");
         return request;
     }
 }
