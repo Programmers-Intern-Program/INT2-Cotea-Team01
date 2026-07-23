@@ -102,6 +102,9 @@ button {
   font-weight: 700;
   line-height: 1.35;
   color: #eef2ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-action {

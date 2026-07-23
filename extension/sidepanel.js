@@ -405,6 +405,9 @@ function renderHeaderTitle() {
   if (!state.onProgrammers) {
     return '프로그래머스 문제';
   }
+  if (state.problemId && state.problemTitle) {
+    return `문제 #${state.problemId}: ${state.problemTitle}`;
+  }
   if (state.problemTitle) {
     return `프로그래머스 문제 - ${state.problemTitle}`;
   }
