@@ -59,6 +59,15 @@ class ConceptGapLlmSignalTest {
     }
 
     @Test
+    void 지시문에_방향검증_개선점은_NO로_명시한다() {
+        String instruction = signal.instruction();
+
+        assertThat(instruction).contains("방향이 맞는지 검증");
+        assertThat(instruction).contains("개선점");
+        assertThat(instruction).contains("반드시 NO");
+    }
+
+    @Test
     void FREE_TEXT_풀이중은_적용대상이다() {
         assertThat(signal.isApplicable(freeText("SOLVING"))).isTrue();
         assertThat(signal.isApplicable(freeText("BEFORE_SOLVE"))).isTrue();
