@@ -107,6 +107,10 @@ public class HintService {
 
         boolean llmSignalApplicable = conceptGapLlmSignal.isApplicable(request);
         boolean fatalApproachApplicable = fatalApproachLlmSignal.isApplicable(request, problem);
+        if (fatalApproachApplicable) {
+            // Lv1~3 등 usesProblemFields에 없어도 판정 기준 메타는 user message에 반드시 실림
+            fatalApproachLlmSignal.ensureSignalsInContext(problemContext, problem);
+        }
         String systemPrompt = promptAssembler.buildSystemPrompt(policy, hintLevel, request);
         if (llmSignalApplicable) {
             systemPrompt = systemPrompt + conceptGapLlmSignal.instruction();
