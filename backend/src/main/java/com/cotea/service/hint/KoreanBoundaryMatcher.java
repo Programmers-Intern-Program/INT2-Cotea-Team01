@@ -10,7 +10,7 @@ import java.util.Set;
  * <p>term 뒤에 오는 글자가 문장 끝/공백/구두점이거나, 미리 정의한 한국어 조사로 시작할 때만
  * "term이 단독으로 쓰였다"고 인정한다. term 앞쪽도 같은 기준(한글/영숫자가 아닌 경계)으로 확인한다.
  */
-final class KoreanBoundaryMatcher {
+public final class KoreanBoundaryMatcher {
 
     private static final Set<String> KOREAN_PARTICLES = Set.of(
             "는", "은", "이", "가", "을", "를", "와", "과", "도", "만",
@@ -23,7 +23,7 @@ final class KoreanBoundaryMatcher {
     private KoreanBoundaryMatcher() {
     }
 
-    static boolean containsAsStandaloneTerm(String text, String term) {
+    public static boolean containsAsStandaloneTerm(String text, String term) {
         if (text == null || term == null || term.isEmpty()) {
             return false;
         }
