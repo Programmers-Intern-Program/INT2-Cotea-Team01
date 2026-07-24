@@ -395,6 +395,16 @@ attachObserverIntervalId = setInterval(() => {
   attachGradingObserver();
 }, 1000);
 
+// 문제 페이지 진입 시 문제 데이터 사전 준비 요청 (fire-and-forget, 응답 대기 안 함)
+const initialProblemId = parseProblemId();
+if (initialProblemId != null && isExtensionContextValid()) {
+  try {
+    chrome.runtime.sendMessage({ type: 'ENSURE_PROBLEM_READY', problemId: initialProblemId });
+  } catch (_error) {
+    // 익스텐션 컨텍스트가 무효화된 경우 등 - fire-and-forget이므로 무시
+  }
+}
+
 // background.js의 요청에 응답
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Cotea Content] 메시지 수신:', message.type);

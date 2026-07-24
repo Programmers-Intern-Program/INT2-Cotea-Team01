@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cotea 문제 메타데이터",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "problemId", "metadataVersion", "reviewedBy", "lastUpdated",
+    "source", "classification", "approach", "solvingSupport", "wrongAnswerDiagnosis"
+  ],
+  "properties": {
+    "problemId": { "type": "integer" },
+    "metadataVersion": { "type": "string" },
+    "reviewedBy": { "type": "null" },
+    "lastUpdated": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "title", "level", "url", "language"],
+      "properties": {
+        "platform": { "const": "programmers" },
+        "title": { "type": "string", "minLength": 1 },
+        "level": { "type": "string", "pattern": "^Lv[1-5]$" },
+        "url": { "type": "string", "format": "uri" },
+        "language": { "const": "java" }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "difficultyReason"],
+      "properties": {
+        "primary": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tag", "subcategory"],
+            "properties": {
+              "tag": {
+                "enum": [
+                  "array", "backtracking", "bfs", "binary_search", "bruteforcing",
+                  "dfs", "dp", "graph_traversal", "greedy", "hash_set", "math",
+                  "prefix_sum", "priority_queue", "queue_deque", "simulation",
+                  "sliding_window", "sorting", "stack", "string", "trees", "two_pointer"
+                ]
+              },
+              "subcategory": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "difficultyReason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "approach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recommendedApproach", "expectedTimeComplexity", "expectedSpaceComplexity", "keyInsight"],
+      "properties": {
+        "recommendedApproach": { "type": "string", "minLength": 1 },
+        "alternativeApproaches": { "type": "array", "items": { "type": "string" } },
+        "expectedTimeComplexity": { "type": "string", "minLength": 1 },
+        "expectedSpaceComplexity": { "type": "string", "minLength": 1 },
+        "complexityVariables": { "type": "object", "additionalProperties": { "type": "string" } },
+        "keyInsight": { "type": "string", "minLength": 1 }
+      }
+    },
+    "solvingSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyDataStructures", "implementationCheckpoints", "stuckPointHints"],
+      "properties": {
+        "keyDataStructures": { "type": "array", "items": { "type": "string" } },
+        "implementationCheckpoints": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 5,
+          "items": { "type": "string" }
+        },
+        "stuckPointHints": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "wrongAnswerDiagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commonMistakes"],
+      "properties": {
+        "commonMistakes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["symptom", "likelyCause", "directionHint"],
+            "properties": {
+              "symptom": { "enum": ["오답", "시간초과", "런타임에러"] },
+              "likelyCause": { "type": "string", "minLength": 1 },
+              "directionHint": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "fatalApproachSignals": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "edgeCases": { "type": "array", "items": { "type": "string" } },
+    "afterSolve": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evaluationCriteria": { "type": "array", "items": { "type": "string" } },
+        "optimizationHints": { "type": "array", "items": { "type": "string" } },
+        "similarProblems": { "type": "array", "maxItems": 0 }
+      }
+    }
+  }
+}

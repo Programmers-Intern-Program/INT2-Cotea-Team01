@@ -23,6 +23,12 @@ public class CoteaProperties {
         private String apiKey;
         private String model = "claude-sonnet-4-6";
         private int maxTokens = 1024;
+        /**
+         * 문제 데이터 생성(JSON 스키마 전체 출력)은 힌트 응답보다 훨씬 길어서 별도 한도가 필요하다.
+         * claude-sonnet-4-6의 실제 상한은 128k지만, 이 스키마가 그 정도로 길어질 일은 없으므로
+         * 여유 있게 16000으로 잡는다(그래도 잘리면 이 값을 더 올리면 된다).
+         */
+        private int problemGenerationMaxTokens = 16000;
         private String baseUrl = "https://api.anthropic.com";
     }
 

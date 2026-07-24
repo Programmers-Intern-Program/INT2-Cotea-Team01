@@ -8,6 +8,7 @@ const DEFAULT_API_CONFIG = {
 const DEFAULT_PROBLEM_ID = 1829;
 const HINT_API_TIMEOUT_MS = 20000;
 const AUTH_API_TIMEOUT_MS = 15000;
+const ENSURE_PROBLEM_READY_TIMEOUT_MS = 150000; // 백엔드 쪽 문제 생성 타임아웃(120초)보다 여유 있게
 
 function getLocalState(defaults) {
   return new Promise((resolve, reject) => {
@@ -276,6 +277,38 @@ async function requestHintFromApi(message) {
   };
 }
 
+async function ensureProblemReady(problemId) {
+  if (problemId == null) {
+    return;
+  }
+
+  const { apiConfig } = await getLocalState({ apiConfig: DEFAULT_API_CONFIG });
+  const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
+  if (mergedConfig.mode !== 'api' || !mergedConfig.baseUrl) {
+    return; // mock 모드에서는 실제 백엔드가 없으므로 호출하지 않음
+  }
+
+  const baseUrl = normalizeApiBaseUrl(mergedConfig);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ENSURE_PROBLEM_READY_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${baseUrl}/api/problems/${problemId}/ensure-ready`, {
+      method: 'POST',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      console.error('[Cotea] ensure-ready 요청 실패:', response.status);
+      return;
+    }
+    console.log('[Cotea] ensure-ready 완료:', problemId);
+  } catch (error) {
+    console.error('[Cotea] ensure-ready 요청 오류:', error.message);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function requestWeeklyReport() {
   const { apiConfig, authState } = await getLocalState({
     apiConfig: DEFAULT_API_CONFIG,
@@ -324,6 +357,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => {
         console.error('[Cotea] CODE_CHANGED 상태 조회 실패:', error.message);
       });
+  }
+
+  if (message.type === 'ENSURE_PROBLEM_READY') {
+    // fire-and-forget: content.js는 응답을 기다리지 않음
+    ensureProblemReady(message.problemId);
   }
 
   if (message.type === 'GRADING_RESULT') {

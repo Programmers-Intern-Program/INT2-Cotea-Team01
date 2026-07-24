@@ -26,6 +26,9 @@ public class ClaudeClient implements LlmClient {
 
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final String DEFAULT_AI_ERROR_MESSAGE = "AI 응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.";
+    private static final Duration DEFAULT_BLOCK_TIMEOUT = Duration.ofSeconds(60);
+    /** max_tokens를 16000까지 올렸으므로, 실제로 그만큼 생성이 필요한 경우 60초로는 부족할 수 있다. */
+    private static final Duration PROBLEM_GENERATION_BLOCK_TIMEOUT = Duration.ofSeconds(120);
 
     private final WebClient claudeWebClient;
     private final CoteaProperties properties;
@@ -33,17 +36,7 @@ public class ClaudeClient implements LlmClient {
 
     @Override
     public String generate(String systemPrompt, List<ConversationMessage> history, String userMessage) {
-        String apiKey = properties.getClaude().getApiKey();
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new CoteaException("AI_SERVICE_ERROR", "ANTHROPIC_API_KEY가 설정되지 않았습니다.", 500);
-        }
-
-        ObjectNode body = objectMapper.createObjectNode();
-        body.put("model", properties.getClaude().getModel());
-        body.put("max_tokens", properties.getClaude().getMaxTokens());
-        body.put("system", systemPrompt);
-
-        ArrayNode messages = body.putArray("messages");
+        ArrayNode messages = objectMapper.createArrayNode();
         if (history != null) {
             for (ConversationMessage message : history) {
                 if (message.getText() == null || message.getText().isBlank()) {
@@ -55,6 +48,56 @@ public class ClaudeClient implements LlmClient {
         }
         messages.add(messageNode("user", userMessage));
 
+        return execute(systemPrompt, messages, properties.getClaude().getMaxTokens(), DEFAULT_BLOCK_TIMEOUT);
+    }
+
+    /**
+     * 이미지를 먼저, 텍스트를 나중에 배치한다 — Anthropic 문서 권고사항
+     * (https://platform.claude.com/docs/en/build-with-claude/vision): 이미지가 텍스트보다 앞에 오면
+     * 결과가 더 좋다. 이미지는 source.type="url"로 전달한다 — 프로그래머스 문제 이미지는 이미
+     * S3에 공개 호스팅돼 있어(예: grepp-programmers.s3....) 다운로드 후 base64로 인코딩할 필요가 없다.
+     */
+    @Override
+    public String generateWithImages(String systemPrompt, String userMessage, List<String> imageUrls) {
+        ObjectNode userNode = objectMapper.createObjectNode();
+        userNode.put("role", "user");
+        ArrayNode content = userNode.putArray("content");
+
+        if (imageUrls != null) {
+            for (String imageUrl : imageUrls) {
+                if (imageUrl == null || imageUrl.isBlank()) {
+                    continue;
+                }
+                ObjectNode imageBlock = content.addObject();
+                imageBlock.put("type", "image");
+                ObjectNode source = imageBlock.putObject("source");
+                source.put("type", "url");
+                source.put("url", imageUrl);
+            }
+        }
+        ObjectNode textBlock = content.addObject();
+        textBlock.put("type", "text");
+        textBlock.put("text", userMessage);
+
+        ArrayNode messages = objectMapper.createArrayNode();
+        messages.add(userNode);
+
+        return execute(systemPrompt, messages, properties.getClaude().getProblemGenerationMaxTokens(),
+                PROBLEM_GENERATION_BLOCK_TIMEOUT);
+    }
+
+    private String execute(String systemPrompt, ArrayNode messages, int maxTokens, Duration timeout) {
+        String apiKey = properties.getClaude().getApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new CoteaException("AI_SERVICE_ERROR", "ANTHROPIC_API_KEY가 설정되지 않았습니다.", 500);
+        }
+
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", properties.getClaude().getModel());
+        body.put("max_tokens", maxTokens);
+        body.put("system", systemPrompt);
+        body.set("messages", messages);
+
         try {
             JsonNode response = claudeWebClient.post()
                     .uri("/v1/messages")
@@ -63,7 +106,7 @@ public class ClaudeClient implements LlmClient {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
-                    .block(Duration.ofSeconds(60));
+                    .block(timeout);
 
             if (response == null) {
                 throw new CoteaException("AI_SERVICE_ERROR", "Claude 응답이 비어 있습니다.", 500);
