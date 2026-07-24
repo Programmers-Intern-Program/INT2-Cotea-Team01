@@ -149,6 +149,7 @@ class HintServiceForbiddenConceptSignalTest {
                 null,
                 new ConceptGapClassifier(),
                 new ConceptGapLlmSignal(),
+                new FatalApproachLlmSignal(),
                 new CoteaProperties(),
                 new LearningLogService(
                         Mockito.mock(JwtTokenProvider.class),
