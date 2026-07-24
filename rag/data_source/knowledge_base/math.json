@@ -1,0 +1,34 @@
+{
+  "doc_id": "math",
+  "category": "math",
+  "subcategory": null,
+  "hint_level_scope": [
+    2,
+    3
+  ],
+  "language": "ko",
+  "content": {
+    "definition": "정수론·조합론 등 수학적 성질을 활용해 답을 유도하는 유형이다. 핵심은 모든 경우를 다 세어보지 않고도 규칙이나 공식으로 답을 구할 수 있는지 판단하는 것이다.",
+    "when_to_use": "입력 규모가 커서 완전탐색으로는 시간 안에 못 끝내는데, 수치 사이에 규칙성(배수, 나머지, 대칭, 조합 등)이 보이는 경우에 해당한다.",
+    "java_specific_notes": "int 범위(약 21억)를 넘는 계산은 long으로 선언해야 하며, 최종 결과뿐 아니라 곱셈 중간 결과가 int 범위를 넘는 경우도 흔히 놓친다. 나머지를 구해야 하는 문제는 매 곱셈 단계마다 나머지 연산을 해줘야 오버플로우를 막을 수 있다."
+  },
+  "source": {
+    "type": "ai_generated",
+    "note": "팀 검수 전 초안"
+  },
+  "applicable_scale": "완전탐색으로 처리 가능한 규모인지(예: N이 10^6 이하)를 먼저 판단하고, 그 이상이면 O(log N)이나 O(sqrt(N)) 수준의 수학적 공식·알고리즘(소수 판별, 거듭제곱 등)이 필요한지 확인해야 한다.",
+  "distinguishing_from": [
+    { "ref": "bruteforcing", "signal": "규칙이나 공식을 찾기 어렵고 입력 범위가 작다면, math보다 bruteforcing으로 전체를 확인하는 편이 더 단순할 수 있다." },
+    { "ref": "dp_general", "signal": "경우의 수를 구하되 부분 문제의 답을 저장해 재활용해야 한다면, math보다 dp_general이 더 구체적인 접근일 수 있다." }
+  ],
+  "often_combined_with": [
+    { "ref": "bruteforcing", "note": "수학적 규칙을 못 찾았을 때 대안으로 완전탐색이 함께 언급되는 경우가 많다." },
+    { "ref": "dp_general", "note": "경우의 수를 구하는 조합론 문제는 dp와 결합되는 경우가 있다." }
+  ],
+  "code_signals": {
+    "keywords": ["% ", "Math.pow(", "Math.sqrt(", "BigInteger", "long "],
+    "exclusion_keywords": [],
+    "keyword_confidence": "low",
+    "confidence_note": "GCD, 소수 판별, 모듈러 연산 등을 표준 API 없이 직접 for/while로 구현하는 경우가 흔해서, 이 키워드들이 안 보인다고 수학적 접근을 안 쓴 것은 아니다. 매칭 여부를 약한 참고 신호로만 쓰고, 비매칭을 부정 신호로 쓰지 말 것(docs/knowledge-base-authoring-rules.md §5-1 참고)."
+  }
+}

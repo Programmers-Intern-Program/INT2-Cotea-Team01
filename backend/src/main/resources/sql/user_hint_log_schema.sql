@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS user_hint_log (
     selected_problem_fields TEXT,
     route VARCHAR(30),
     llm_provider VARCHAR(50),
+    solved BOOLEAN,
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     INDEX idx_user_hint_log_user_created_at (user_id, created_at),

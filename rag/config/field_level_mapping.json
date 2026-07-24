@@ -1,5 +1,5 @@
 {
-  "_comment": "field(용도) -> 관련 힌트 레벨 매핑. 레벨 체계가 바뀌면 이 파일만 수정하면 되고, knowledge_base_docs.json / common_pitfalls_keywords.json은 건드릴 필요 없다. 벡터DB(Chroma)를 쓰지 않기로 하면서 이 매핑은 순위 가산점(soft boost)이 아니라 하드 필터로 쓴다 — 현재 힌트 레벨에 해당하지 않는 필드는 애초에 프롬프트에 포함되지 않는다. hintLevelPolicy.allow/forbid와 함께 이중으로 안전 규칙을 담당한다.",
+  "_comment": "field(용도) -> 관련 힌트 레벨 매핑. 레벨 체계가 바뀌면 이 파일만 수정하면 되고, knowledge_base_docs.json은 건드릴 필요 없다. 벡터DB(Chroma)를 쓰지 않기로 하면서 이 매핑은 순위 가산점(soft boost)이 아니라 하드 필터로 쓴다 — 현재 힌트 레벨에 해당하지 않는 필드는 애초에 프롬프트에 포함되지 않는다. hintLevelPolicy.allow/forbid와 함께 이중으로 안전 규칙을 담당한다.",
 
   "knowledge_base": {
     "definition": {
@@ -17,17 +17,10 @@
     "applicable_scale": {
       "purpose": "이 접근이 통하는/안 통하는 입력 규모 기준 — '명백히 잘못된 접근' 예외 판단의 근거",
       "related_levels": [2, 4]
-    }
-  },
-
-  "common_pitfalls": {
-    "mistake_description": {
-      "purpose": "실수 패턴 설명",
-      "related_levels": [4]
     },
-    "detection_signal": {
-      "purpose": "코드에서 이 실수를 감지하는 신호",
-      "related_levels": [4]
+    "often_combined_with": {
+      "purpose": "구현 시 함께 결합되는 자료구조/기법 안내 (예: bfs + priority_queue)",
+      "related_levels": [3]
     }
   }
 }

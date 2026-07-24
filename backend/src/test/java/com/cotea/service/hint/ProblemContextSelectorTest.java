@@ -72,6 +72,63 @@ class ProblemContextSelectorTest {
         assertThat(context.path("fields").isEmpty()).isTrue();
     }
 
+    @Test
+    void extractsSubcategoriesWhenPresent() throws IOException {
+        JsonNode problem = objectMapper.readTree("""
+                {
+                  "classification": {
+                    "primary": [
+                      { "tag": "dp", "subcategory": ["dp_knapsack"] },
+                      { "tag": "math", "subcategory": [] }
+                    ]
+                  }
+                }
+                """);
+
+        assertThat(selector.extractSubcategories(problem)).containsExactly("dp_knapsack");
+    }
+
+    @Test
+    void extractsMultipleSubcategoriesFromOneTag() throws IOException {
+        JsonNode problem = objectMapper.readTree("""
+                {
+                  "classification": {
+                    "primary": [
+                      { "tag": "string", "subcategory": ["string_general", "string_pattern_basic"] }
+                    ]
+                  }
+                }
+                """);
+
+        assertThat(selector.extractSubcategories(problem)).containsExactly("string_general", "string_pattern_basic");
+    }
+
+    @Test
+    void extractsEmptySubcategoriesWhenNoneSpecified() throws IOException {
+        JsonNode problem = sampleProblem();
+
+        assertThat(selector.extractSubcategories(problem)).isEmpty();
+    }
+
+    @Test
+    void lv1Select_doesNotIncludeFatalSignals_untilEnsure() throws IOException {
+        JsonNode problem = sampleProblem();
+        HintRequest request = new HintRequest();
+        request.setProblemId(1829);
+        request.setStage("SOLVING");
+        request.setHintLevel(1);
+        request.setQuestionType("FREE_TEXT");
+        request.setQuestionText("이 방향이 맞나요?");
+        request.setUserCode("class Solution {}");
+
+        ObjectNode context = selector.select(problem, policy, request, 1);
+        assertThat(context.path("fields").has("wrongAnswerDiagnosis.fatalApproachSignals")).isFalse();
+
+        new FatalApproachLlmSignal().ensureSignalsInContext(context, problem);
+        assertThat(context.path("fields").path("wrongAnswerDiagnosis.fatalApproachSignals"))
+                .hasSize(1);
+    }
+
     private HintRequest wrongAnswerReasonRequest(String submissionResult, String buttonId) {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);

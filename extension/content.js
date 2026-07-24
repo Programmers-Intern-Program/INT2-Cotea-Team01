@@ -82,20 +82,19 @@ function parseProblemId() {
 }
 
 function detectSolvedStatus() {
-  const bodyText = document.body ? document.body.innerText.replace(/\s+/g, ' ') : '';
-  const solvedSignals = [
-    '정답입니다',
-    '정확성 테스트를 통과했습니다',
-    '테스트를 통과했습니다',
-    '채점을 통과했습니다',
-    'Accepted',
-  ];
-
-  if (solvedSignals.some((signal) => bodyText.includes(signal))) {
-    return true;
+  const container = findGradingContainer();
+  if (!container) {
+    return null;
   }
 
-  return null;
+  const headings = Array.from(container.querySelectorAll('.console-heading'))
+    .filter((headingEl) => isResultHeadingText(headingEl.textContent || ''));
+  if (!headings.length) {
+    return null;
+  }
+
+  const latestHeading = headings[headings.length - 1];
+  return parseGradingPassed(latestHeading);
 }
 
 function getCurrentLanguage() {
