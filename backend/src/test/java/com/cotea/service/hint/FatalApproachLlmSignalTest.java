@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.service.hint.FatalApproachLlmSignal.Parsed;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -89,6 +90,52 @@ class FatalApproachLlmSignalTest {
     void AFTER_SOLVE는_미적용() throws Exception {
         assertThat(signal.isApplicable(requestWithCode("AFTER_SOLVE"), problemWithFatalSignals()))
                 .isFalse();
+    }
+
+    @Test
+    void 지시문에_신호_본문_노출_금지가_있다() {
+        String instruction = signal.instruction();
+
+        assertThat(instruction).contains("YES/NO 판정에만");
+        assertThat(instruction).contains("나열하거나");
+        assertThat(instruction).contains("복사하지");
+    }
+
+    @Test
+    void ensureSignalsInContext_빈_fields에도_신호를_강제_포함한다() {
+        ObjectNode problem = problemWithFatalSignals();
+        ObjectNode problemContext = objectMapper.createObjectNode();
+        problemContext.putObject("fields");
+
+        signal.ensureSignalsInContext(problemContext, problem);
+
+        JsonNode signals = problemContext.path("fields").path(FatalApproachLlmSignal.FATAL_SIGNALS_FIELD);
+        assertThat(signals.isArray()).isTrue();
+        assertThat(signals).hasSize(1);
+        assertThat(signals.get(0).asText()).isEqualTo("0인 칸을 영역 계산에 포함하는 방식");
+    }
+
+    @Test
+    void ensureSignalsInContext_이미_있으면_덮어쓴다() {
+        ObjectNode problem = problemWithFatalSignals();
+        ObjectNode problemContext = objectMapper.createObjectNode();
+        ObjectNode fields = problemContext.putObject("fields");
+        fields.putArray(FatalApproachLlmSignal.FATAL_SIGNALS_FIELD).add("오래된신호");
+
+        signal.ensureSignalsInContext(problemContext, problem);
+
+        assertThat(problemContext.path("fields").path(FatalApproachLlmSignal.FATAL_SIGNALS_FIELD).get(0).asText())
+                .isEqualTo("0인 칸을 영역 계산에 포함하는 방식");
+    }
+
+    @Test
+    void ensureSignalsInContext_신호없으면_fields를_건드리지_않는다() {
+        ObjectNode problemContext = objectMapper.createObjectNode();
+        problemContext.putObject("fields");
+
+        signal.ensureSignalsInContext(problemContext, objectMapper.createObjectNode());
+
+        assertThat(problemContext.path("fields").isEmpty()).isTrue();
     }
 
     private HintRequest requestWithCode(String stage) {

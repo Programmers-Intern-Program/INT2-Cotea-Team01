@@ -2,6 +2,7 @@ package com.cotea.service.hint;
 
 import com.cotea.controller.dto.HintRequest;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Component;
  * 백엔드는 파싱·제거한 뒤 YES이면 사용자 답변 앞에 선제 경고 블록을 강제한다.
  *
  * <p>{@code userCode}가 있고 문제 메타에 {@code fatalApproachSignals}가 있을 때만 적용한다.
+ * 적용 시 hint level/stage 정책과 무관하게 해당 신호를 {@code problemContext}에 넣어
+ * 모델이 메타 기준 없이 추측 판정하지 않도록 한다.
  */
 @Component
 public class FatalApproachLlmSignal {
@@ -22,6 +25,8 @@ public class FatalApproachLlmSignal {
     static final String WARNING_BLOCK =
             "지금 코드 방향은 이 문제에서 답이 나오기 어려운 접근일 수 있어요. "
                     + "다른 관점으로 다시 생각해보면 좋아요.\n\n";
+
+    static final String FATAL_SIGNALS_FIELD = "wrongAnswerDiagnosis.fatalApproachSignals";
 
     private static final Pattern MARKER = Pattern.compile(
             "\\[\\[\\s*FATAL_APPROACH\\s*:\\s*([A-Za-z가-힣]+)\\s*\\]\\]",
@@ -38,6 +43,8 @@ public class FatalApproachLlmSignal {
             - YES: 사용자 코드/질문이 문제 메타의 fatalApproachSignals에 해당하는,
               답이 구조적으로 나올 수 없는 접근일 때 (비효율이지만 원리상 가능한 접근은 NO).
             - NO: 접근이 틀리지 않았거나, 코드가 부족해 판단이 어렵거나, 단순 구현/디버깅 질문일 때.
+            - fatalApproachSignals는 YES/NO 판정에만 참고하고, 사용자에게 보이는 답변에는
+              목록을 나열하거나 문장을 그대로 복사하지 마라.
             """;
 
     public boolean isApplicable(HintRequest request, JsonNode problem) {
@@ -56,6 +63,28 @@ public class FatalApproachLlmSignal {
 
     public String instruction() {
         return INSTRUCTION;
+    }
+
+    /**
+     * hint level/stage {@code usesProblemFields}에 없어도, FATAL 판정 시 신호 목록을
+     * {@code problemContext.fields}에 강제 포함한다.
+     */
+    public void ensureSignalsInContext(ObjectNode problemContext, JsonNode problem) {
+        if (problemContext == null || problem == null) {
+            return;
+        }
+        JsonNode signals = problem.path("wrongAnswerDiagnosis").path("fatalApproachSignals");
+        if (!signals.isArray() || signals.isEmpty()) {
+            return;
+        }
+        JsonNode fieldsNode = problemContext.get("fields");
+        ObjectNode fields;
+        if (fieldsNode != null && fieldsNode.isObject()) {
+            fields = (ObjectNode) fieldsNode;
+        } else {
+            fields = problemContext.putObject("fields");
+        }
+        fields.set(FATAL_SIGNALS_FIELD, signals);
     }
 
     public Parsed parse(String rawText) {

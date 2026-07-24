@@ -110,6 +110,25 @@ class ProblemContextSelectorTest {
         assertThat(selector.extractSubcategories(problem)).isEmpty();
     }
 
+    @Test
+    void lv1Select_doesNotIncludeFatalSignals_untilEnsure() throws IOException {
+        JsonNode problem = sampleProblem();
+        HintRequest request = new HintRequest();
+        request.setProblemId(1829);
+        request.setStage("SOLVING");
+        request.setHintLevel(1);
+        request.setQuestionType("FREE_TEXT");
+        request.setQuestionText("이 방향이 맞나요?");
+        request.setUserCode("class Solution {}");
+
+        ObjectNode context = selector.select(problem, policy, request, 1);
+        assertThat(context.path("fields").has("wrongAnswerDiagnosis.fatalApproachSignals")).isFalse();
+
+        new FatalApproachLlmSignal().ensureSignalsInContext(context, problem);
+        assertThat(context.path("fields").path("wrongAnswerDiagnosis.fatalApproachSignals"))
+                .hasSize(1);
+    }
+
     private HintRequest wrongAnswerReasonRequest(String submissionResult, String buttonId) {
         HintRequest request = new HintRequest();
         request.setProblemId(1829);
