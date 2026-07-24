@@ -36,4 +36,12 @@ public class AppConfig {
                 .baseUrl(properties.getKakao().getApiBaseUrl())
                 .build();
     }
+
+    /** 문제 데이터가 없을 때 프로그래머스 문제 상세 페이지 HTML을 가져오는 용도. */
+    @Bean
+    WebClient programmersWebClient() {
+        return WebClient.builder()
+                .baseUrl("https://school.programmers.co.kr")
+                .build();
+    }
 }
