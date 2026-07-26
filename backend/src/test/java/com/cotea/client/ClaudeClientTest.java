@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.cotea.config.CoteaProperties;
 import com.cotea.exception.CoteaException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -35,6 +36,44 @@ class ClaudeClientTest {
         String result = client.generate("system", null, "user");
 
         assertThat(result).isEqualTo("힌트 응답입니다.");
+    }
+
+    @Test
+    void returnsTextFromClaudeResponseWithImages() {
+        ClaudeClient client = clientWithResponse(
+                HttpStatus.OK,
+                """
+                {
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "이미지를 반영한 응답입니다."
+                    }
+                  ]
+                }
+                """
+        );
+
+        String result = client.generateWithImages(
+                "system", "user", List.of("https://grepp-programmers.s3.example.com/example.png"));
+
+        assertThat(result).isEqualTo("이미지를 반영한 응답입니다.");
+    }
+
+    @Test
+    void generateWithImagesWorksWithoutAnyImageUrls() {
+        ClaudeClient client = clientWithResponse(
+                HttpStatus.OK,
+                """
+                {
+                  "content": [{ "type": "text", "text": "이미지 없이도 동작." }]
+                }
+                """
+        );
+
+        String result = client.generateWithImages("system", "user", List.of());
+
+        assertThat(result).isEqualTo("이미지 없이도 동작.");
     }
 
     @Test

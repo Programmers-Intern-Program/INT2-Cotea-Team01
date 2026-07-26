@@ -11,8 +11,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class HintAnswerGuardrail {
 
-    /** package-private: {@link ForbiddenConceptLlmSignal}이 자기점검 마커 목록으로 동일 리스트를 재사용한다. */
-    static final List<String> LEVEL_1_FORBIDDEN_TERMS = List.of(
+    /**
+     * public: {@link ForbiddenConceptLlmSignal}이 자기점검 마커 목록으로 재사용하고,
+     * {@code com.cotea.service.problem.generation} 패키지의 문제 데이터 생성 검증기(§8 체크리스트,
+     * docs/problem-data-authoring-rules.md)도 Lv1 금지어 린트에 동일 목록을 재사용한다.
+     */
+    public static final List<String> LEVEL_1_FORBIDDEN_TERMS = List.of(
             "BFS", "DFS", "DP", "Union-Find", "유니온 파인드",
             "큐", "스택", "visited", "방문 배열"
     );

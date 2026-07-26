@@ -49,6 +49,14 @@ class ConceptGapClassifierTest {
     }
 
     @Test
+    void 방향_검증이나_개선점_요청은_개념부재가_아니다() {
+        assertThat(classifier.isConceptGap(
+                freeText("SOLVING"), "이 BFS 탐색 방향이 맞나요? 개선점만 짧게 알려주세요")).isFalse();
+        assertThat(classifier.isConceptGap(freeText("SOLVING"), "개선점만 알려주세요")).isFalse();
+        assertThat(classifier.isConceptGap(freeText("SOLVING"), "이 접근 방향이 맞을까요?")).isFalse();
+    }
+
+    @Test
     void 자기_코드_설명_요청은_개념부재가_아니다() {
         assertThat(classifier.isConceptGap(freeText("SOLVING"), "이 코드 설명해주세요")).isFalse();
         assertThat(classifier.isConceptGap(freeText("WRONG_ANSWER"), "제 코드 어디가 문제인지 알려주세요")).isFalse();
