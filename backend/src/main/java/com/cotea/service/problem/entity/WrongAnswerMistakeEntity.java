@@ -28,9 +28,9 @@ public class WrongAnswerMistakeEntity {
 
     private String symptom;
 
-    @Column(name = "likely_cause")
+    @Column(name = "likely_cause", columnDefinition = "TEXT")
     private String likelyCause;
 
-    @Column(name = "direction_hint")
+    @Column(name = "direction_hint", columnDefinition = "TEXT")
     private String directionHint;
 }

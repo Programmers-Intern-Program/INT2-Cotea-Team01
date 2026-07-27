@@ -26,6 +26,6 @@ public class EvaluationCriteriaEntity {
     @Column(name = "problem_id")
     private Integer problemId;
 
-    @Column(name = "criteria_text")
+    @Column(name = "criteria_text", columnDefinition = "TEXT")
     private String criteriaText;
 }

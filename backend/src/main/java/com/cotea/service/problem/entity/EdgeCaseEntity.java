@@ -26,6 +26,6 @@ public class EdgeCaseEntity {
     @Column(name = "problem_id")
     private Integer problemId;
 
-    @Column(name = "case_text")
+    @Column(name = "case_text", columnDefinition = "TEXT")
     private String caseText;
 }

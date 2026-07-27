@@ -26,6 +26,6 @@ public class OptimizationHintEntity {
     @Column(name = "problem_id")
     private Integer problemId;
 
-    @Column(name = "hint_text")
+    @Column(name = "hint_text", columnDefinition = "TEXT")
     private String hintText;
 }

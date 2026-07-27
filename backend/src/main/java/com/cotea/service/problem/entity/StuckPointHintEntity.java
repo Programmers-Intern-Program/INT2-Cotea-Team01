@@ -29,6 +29,6 @@ public class StuckPointHintEntity {
     @Column(name = "point_key")
     private String pointKey;
 
-    @Column(name = "hint_text")
+    @Column(name = "hint_text", columnDefinition = "TEXT")
     private String hintText;
 }

@@ -26,7 +26,7 @@ public class SolvingCheckpointEntity {
     @Column(name = "problem_id")
     private Integer problemId;
 
-    @Column(name = "checkpoint_text")
+    @Column(name = "checkpoint_text", columnDefinition = "TEXT")
     private String checkpointText;
 
     @Column(name = "order_index")
