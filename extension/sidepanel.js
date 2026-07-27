@@ -181,6 +181,36 @@ function ensureWelcomeMessage() {
   });
 }
 
+// 언어 지원 여부가 바뀔 때(storage.onChanged로 실시간 감지되든, syncPageContext로
+// 직접 재동기화되든) 항상 같은 규칙으로 처리하도록 공용 함수로 뺐다. panel을
+// 새로 열 때 syncPageContext가 이 함수를 안 거치면, 이미 다른 언어가 선택된
+// 채로 패널을 열었을 때 미지원 상태가 반영되지 않는 문제가 있었다(Fix/fe#123).
+function applyLanguageStatus(nextLanguage, nextUnsupported) {
+  const wasUnsupported = state.languageNotSupported;
+  const languageChanged = nextLanguage != null && nextLanguage !== state.currentLanguage;
+
+  if (nextLanguage != null) {
+    state.currentLanguage = nextLanguage;
+  }
+  state.languageNotSupported = Boolean(nextUnsupported);
+
+  // languageNotSupported는 값 자체(true/true)가 안 바뀌면 storage.onChanged에
+  // 아예 안 잡혀서(예: C++ -> Python, 둘 다 미지원), currentLanguage만 바뀐
+  // 경우도 같이 봐야 "다른 미지원 언어로 또 바꿨을 때" 안내가 갱신된다.
+  if (state.languageNotSupported && (!wasUnsupported || languageChanged)) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: `현재 선택 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요.`,
+      timestamp: nowLabel(),
+      languageNotice: true,
+    });
+  } else if (!state.languageNotSupported && wasUnsupported) {
+    // Java로 복귀하면 더 이상 유효하지 않은 미지원 안내를 대화에서 제거한다.
+    state.messages = state.messages.filter((message) => !message.languageNotice);
+  }
+}
+
 async function syncPageContext() {
   try {
     const response = await sendRuntimeMessage({ type: 'SYNC_CODE' });
@@ -198,6 +228,9 @@ async function syncPageContext() {
     }
     if (response && Object.prototype.hasOwnProperty.call(response, 'solved')) {
       state.problemSolved = response.solved;
+    }
+    if (response && Object.prototype.hasOwnProperty.call(response, 'languageNotSupported')) {
+      applyLanguageStatus(response.language, response.languageNotSupported);
     }
   } catch (_error) {
     // 프로그래머스 탭이 없으면 무시
@@ -560,6 +593,9 @@ function renderComposerPlaceholder() {
   if (!state.onProgrammers) {
     return OFF_SITE_PLACEHOLDER;
   }
+  if (state.languageNotSupported) {
+    return `현재 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요`;
+  }
   if (!state.stage) {
     return '먼저 위에서 지금 상태를 선택해주세요';
   }
@@ -823,10 +859,10 @@ function renderShell() {
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
+              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
               ${isActiveChipUnedited() ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
-            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || !isComposerReady() ? 'disabled' : ''}>
+            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady() ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
             </button>
           </div>
@@ -1317,7 +1353,7 @@ async function fetchRecommendations() {
 async function handleSend() {
   const question = state.input.trim();
   const chipLabel = state.activeChip;
-  if (!question || state.busy || !state.onProgrammers || !isComposerReady()) {
+  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady()) {
     return;
   }
 
@@ -1499,16 +1535,20 @@ async function initialize() {
     });
   }
 
+  // syncPageContext()가 언어 미지원 안내를 먼저 messages에 쌓아버리면
+  // ensureWelcomeMessage()가 "이미 메시지가 있다"고 판단해 웰컴 인사말을
+  // 건너뛰게 되므로, 웰컴 메시지부터 먼저 채워둔다.
+  ensureWelcomeMessage();
+
   await syncPageContext();
 
   // 패널을 연 시점에 실제로 프로그래머스 탭을 보고 있는지 먼저 확인한다.
   // problemId/gradingResult는 다른 사이트로 넘어가도 storage에 마지막 문제
-  // 상태로 계속 남아있어서, 이 확인 없이는 웰컴 메시지/헤더에 예전 문제 번호가
-  // 그대로 뜨고 예전 채점 결과가 방금 감지된 것처럼 재생돼버린다.
+  // 상태로 계속 남아있어서, 이 확인 없이는 헤더에 예전 문제 번호가 그대로
+  // 뜨고 예전 채점 결과가 방금 감지된 것처럼 재생돼버린다.
   const initialActiveTab = await queryActiveTab();
   state.onProgrammers = isTabOnProgrammers(initialActiveTab);
 
-  ensureWelcomeMessage();
   if (pendingGradingResult) {
     applyGradingResult(pendingGradingResult);
   }
@@ -1573,21 +1613,11 @@ async function initialize() {
       state.codeDirty = Boolean(changes.codeDirty.newValue);
     }
 
-    if (changes.currentLanguage) {
-      state.currentLanguage = changes.currentLanguage.newValue || 'Java';
-    }
-
-    if (changes.languageNotSupported) {
-      const nextLanguageNotSupported = Boolean(changes.languageNotSupported.newValue);
-      if (nextLanguageNotSupported && !state.languageNotSupported) {
-        state.messages.push({
-          id: Date.now(),
-          role: 'ai',
-          text: `현재 선택 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요.`,
-          timestamp: nowLabel(),
-        });
-      }
-      state.languageNotSupported = nextLanguageNotSupported;
+    if (changes.currentLanguage || changes.languageNotSupported) {
+      applyLanguageStatus(
+        changes.currentLanguage ? (changes.currentLanguage.newValue || 'Java') : state.currentLanguage,
+        changes.languageNotSupported ? Boolean(changes.languageNotSupported.newValue) : state.languageNotSupported
+      );
     }
 
     if (changes.gradingResult) {
