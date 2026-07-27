@@ -40,7 +40,11 @@ public class AuthService {
                 .append("/oauth/authorize")
                 .append("?response_type=code")
                 .append("&client_id=").append(encodeQueryParam(properties.getKakao().getClientId()))
-                .append("&redirect_uri=").append(encodeQueryParam(redirectUri));
+                .append("&redirect_uri=").append(encodeQueryParam(redirectUri))
+                // scope를 명시하지 않으면 콘솔에 "필수 동의"로 등록된 항목만 요청되어,
+                // 닉네임/프로필 사진이 선택 동의로 등록돼 있으면 사용자가 동의 화면에서
+                // 아예 물어보지도 못하고 kakao_account.profile이 비어서 온다(Fix/be#133).
+                .append("&scope=").append(encodeQueryParam("profile_nickname,profile_image"));
 
         if (state != null && !state.isBlank()) {
             url.append("&state=").append(encodeQueryParam(state));

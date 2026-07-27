@@ -73,6 +73,7 @@ const state = {
   showLogin: false,
   loggedIn: false,
   kakaoNickname: null,
+  kakaoProfileImageUrl: null,
   authState: null,
   loginPending: false,
   loginSuccess: false,
@@ -255,6 +256,7 @@ function applyAuthState(authState) {
   state.loggedIn = Boolean(authState && authState.accessToken);
   const user = authState && authState.user ? authState.user : null;
   state.kakaoNickname = user && user.nickname ? user.nickname : null;
+  state.kakaoProfileImageUrl = user && user.profileImageUrl ? user.profileImageUrl : null;
 }
 
 function normalizeApiBaseUrl() {
@@ -641,13 +643,18 @@ function renderSubmissionResultSelector() {
   `;
 }
 
-function avatarInitial() {
-  return (state.kakaoNickname || '').trim().charAt(0) || '나';
+function renderAvatarInner() {
+  // 프로필 사진이 없는 카카오 계정도 많아서, 닉네임 첫 글자 대신 카카오
+  // 브랜드 아이콘을 기본값으로 쓴다 (로그인 버튼의 말풍선 아이콘과 동일).
+  if (state.kakaoProfileImageUrl) {
+    return `<img class="account-avatar-photo" src="${escapeHtml(state.kakaoProfileImageUrl)}" alt="" />`;
+  }
+  return `<span class="kakao-bubble-icon" aria-hidden="true"></span>`;
 }
 
 function renderAccountButtonInner() {
   if (state.loggedIn) {
-    return `<span class="account-avatar">${escapeHtml(avatarInitial())}</span>`;
+    return `<span class="account-avatar">${renderAvatarInner()}</span>`;
   }
   return `
     <svg class="account-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -666,7 +673,7 @@ function renderProfileView() {
           <button type="button" id="login-close" class="login-close" aria-label="닫기">✕</button>
         </div>
         <div class="profile-row">
-          <span class="account-avatar account-avatar--lg">${escapeHtml(avatarInitial())}</span>
+          <span class="account-avatar account-avatar--lg">${renderAvatarInner()}</span>
           <div class="profile-info">
             <p class="profile-name">${escapeHtml(state.kakaoNickname || '')}</p>
             <p class="profile-sub">카카오 계정으로 로그인됨</p>
