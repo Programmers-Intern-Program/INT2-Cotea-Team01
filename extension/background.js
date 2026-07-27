@@ -384,6 +384,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
 
+  if (message.type === 'CLEAR_STALE_GRADING_RESULT') {
+    // 새로고침 등으로 콘솔에 결과가 없는 상태로 재진입했을 때 content.js가 보낸다.
+    // storage에 남아있는 이전 결과가 지금 문제 것일 때만 지운다 - 다른 문제/탭의
+    // 결과를 실수로 지우지 않기 위함이다.
+    getLocalState({ gradingResult: null })
+      .then(({ gradingResult }) => {
+        if (gradingResult && gradingResult.problemId === message.problemId) {
+          return setLocalState({ gradingResult: null });
+        }
+      })
+      .catch((error) => {
+        console.error('[Cotea] gradingResult 초기화 실패:', error.message);
+      });
+  }
+
   if (message.type === 'GET_PANEL_STATE') {
     getLocalState({
       latestCode: '',

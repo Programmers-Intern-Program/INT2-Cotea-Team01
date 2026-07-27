@@ -258,6 +258,21 @@ function findGradingContainer() {
   return document.querySelector('#output') || document.querySelector('.console-content');
 }
 
+function clearStaleGradingResult() {
+  if (!isExtensionContextValid()) {
+    handleContextInvalidated();
+    return;
+  }
+  try {
+    chrome.runtime.sendMessage({
+      type: 'CLEAR_STALE_GRADING_RESULT',
+      problemId: parseProblemId(),
+    });
+  } catch (_error) {
+    handleContextInvalidated();
+  }
+}
+
 function isResultHeadingText(text) {
   // "채점 결과"(제출 후 채점하기) / "테스트 결과"(코드 실행, 샘플 테스트케이스만 - 실제 DOM
   // 문구는 "테스트 결과 (~˘▽˘)~") 둘 다 감지 대상. (2026-07-20 실기기 DOM 확인)
@@ -372,11 +387,18 @@ function attachGradingObserver() {
   observedGradingContainerEl = container;
   // 관찰 시작 시점에 이미 떠 있는 결과(예전 결과가 남아있는 새로고침 직후)는
   // "새로운 실행/채점"이 아니므로 baseline으로만 기록하고 알리지 않는다.
-  container.querySelectorAll('.console-heading').forEach((headingEl) => {
-    if (isResultHeadingText(headingEl.textContent)) {
-      processedGradingHeadings.set(headingEl, getGradingScopeText(headingEl));
-    }
+  const existingResultHeadings = Array.from(container.querySelectorAll('.console-heading'))
+    .filter((headingEl) => isResultHeadingText(headingEl.textContent));
+  existingResultHeadings.forEach((headingEl) => {
+    processedGradingHeadings.set(headingEl, getGradingScopeText(headingEl));
   });
+
+  if (existingResultHeadings.length === 0) {
+    // 콘솔에 결과가 하나도 없는 시점(새로고침 직후 등)이면, storage에 남아있는
+    // 이전 채점 결과가 패널을 다시 열 때 방금 감지된 것처럼 재생되지 않도록
+    // 지금 문제에 대한 gradingResult를 지운다 (Fix/fe#122).
+    clearStaleGradingResult();
+  }
 
   if (gradingObserver) {
     gradingObserver.disconnect();
