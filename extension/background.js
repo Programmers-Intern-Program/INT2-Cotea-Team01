@@ -10,6 +10,12 @@ const HINT_API_TIMEOUT_MS = 20000;
 const AUTH_API_TIMEOUT_MS = 15000;
 const ENSURE_PROBLEM_READY_TIMEOUT_MS = 150000; // 백엔드 쪽 문제 생성 타임아웃(120초)보다 여유 있게
 
+function isJavaLanguage(language) {
+  // /java/i(부분 문자열 매칭)로는 "JavaScript"도 "Java"를 포함해 지원 언어로
+  // 오인된다. 단어 경계(\b)로 "Java"/"Java 17" 등만 잡고 "JavaScript"는 제외한다.
+  return /\bjava\b/i.test(language || '');
+}
+
 function getLocalState(defaults) {
   return new Promise((resolve, reject) => {
     chrome.storage.local.get(defaults, (result) => {
@@ -350,7 +356,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (message.language) {
           nextState.currentLanguage = message.language;
-          nextState.languageNotSupported = !/java/i.test(message.language);
+          nextState.languageNotSupported = !isJavaLanguage(message.language);
         }
         chrome.storage.local.set(nextState);
       })
@@ -522,7 +528,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           console.log('[Cotea] 코드 수신 완료:', response.code.length, '자');
 
           const language = response.language || 'Unknown';
-          const isJava = /java/i.test(language);
+          const isJava = isJavaLanguage(language);
 
           // 받은 코드를 저장
           const nextState = {
@@ -544,6 +550,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
           sendResponse({
             ...response,
+            language,
+            languageNotSupported: !isJava,
             warning: isJava ? '' : `현재 선택 언어(${language})는 미지원입니다. Java로 바꿔주세요.`,
           });
         } else if (response && response.error) {
