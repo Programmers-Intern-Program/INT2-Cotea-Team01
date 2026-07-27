@@ -26,6 +26,6 @@ public class FatalApproachSignalEntity {
     @Column(name = "problem_id")
     private Integer problemId;
 
-    @Column(name = "signal_text")
+    @Column(name = "signal_text", columnDefinition = "TEXT")
     private String signalText;
 }

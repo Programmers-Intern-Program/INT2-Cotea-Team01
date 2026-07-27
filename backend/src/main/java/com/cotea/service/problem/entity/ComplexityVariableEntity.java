@@ -29,6 +29,6 @@ public class ComplexityVariableEntity {
     @Column(name = "variable_name")
     private String variableName;
 
-    @Column(name = "variable_description")
+    @Column(name = "variable_description", columnDefinition = "TEXT")
     private String variableDescription;
 }

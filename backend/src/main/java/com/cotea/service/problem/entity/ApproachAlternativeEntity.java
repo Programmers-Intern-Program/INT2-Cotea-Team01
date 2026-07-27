@@ -26,6 +26,6 @@ public class ApproachAlternativeEntity {
     @Column(name = "problem_id")
     private Integer problemId;
 
-    @Column(name = "approach_name")
+    @Column(name = "approach_name", columnDefinition = "TEXT")
     private String approachName;
 }

@@ -40,10 +40,10 @@ public class ProblemEntity {
     private String level;
     private String url;
 
-    @Column(name = "difficulty_reason")
+    @Column(name = "difficulty_reason", columnDefinition = "TEXT")
     private String difficultyReason;
 
-    @Column(name = "recommended_approach")
+    @Column(name = "recommended_approach", columnDefinition = "TEXT")
     private String recommendedApproach;
 
     @Column(name = "expected_time_complexity")
@@ -52,7 +52,7 @@ public class ProblemEntity {
     @Column(name = "expected_space_complexity")
     private String expectedSpaceComplexity;
 
-    @Column(name = "key_insight")
+    @Column(name = "key_insight", columnDefinition = "TEXT")
     private String keyInsight;
 
     @Column(name = "metadata_version")
