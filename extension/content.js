@@ -94,7 +94,7 @@ function detectSolvedStatus() {
   }
 
   const latestHeading = headings[headings.length - 1];
-  return parseGradingPassed(latestHeading);
+  return parseGradingPassed(getGradingScopeText(latestHeading));
 }
 
 function getCurrentLanguage() {
