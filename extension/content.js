@@ -165,6 +165,7 @@ let contextInvalidated = false;
 let attachObserverIntervalId = null;
 let observedGradingContainerEl = null;
 let gradingObserver = null;
+let gradingCheckDebounceTimer = null;
 // 헤딩 엘리먼트별로 "마지막으로 처리한 콘솔 텍스트"를 저장한다. 단순 WeakSet(엘리먼트
 // 자체만 기억)이었을 때는, 프로그래머스가 같은 결과 영역 DOM 엘리먼트를 재사용해
 // textContent만 갱신하는 경우(연속으로 "제출 후 채점하기"만 눌렀을 때) 최초 1회 이후
@@ -190,6 +191,7 @@ function handleContextInvalidated() {
     gradingObserver.disconnect();
   }
   clearTimeout(changeDebounceTimer);
+  clearTimeout(gradingCheckDebounceTimer);
   if (attachObserverIntervalId) {
     clearInterval(attachObserverIntervalId);
   }
@@ -383,7 +385,14 @@ function attachGradingObserver() {
   }
 
   gradingObserver = new MutationObserver(() => {
-    checkForNewGradingResults(container);
+    // 결과 패널이 heading → 테스트케이스 상세 순으로 여러 번에 걸쳐 그려지는 경우,
+    // 매 mutation마다 즉시 검사하면 완성 전 중간 스냅샷과 최종 스냅샷의 scopeText가
+    // 서로 달라 둘 다 "새 결과"로 오인되어 GRADING_RESULT가 중복 전송된다(구분선 중복
+    // 생성 버그, Fix/fe#121). DOM이 잠잠해질 때까지 기다렸다가 한 번만 검사한다.
+    clearTimeout(gradingCheckDebounceTimer);
+    gradingCheckDebounceTimer = setTimeout(() => {
+      checkForNewGradingResults(container);
+    }, 400);
   });
   gradingObserver.observe(container, { childList: true, subtree: true });
 
