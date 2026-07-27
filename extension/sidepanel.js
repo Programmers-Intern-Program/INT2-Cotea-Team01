@@ -1065,6 +1065,16 @@ function applyGradingResult(gradingResult) {
     const detected = gradingResult.failureReason;
     state.submissionResult = AUTO_DETECTABLE_SUBMISSION_RESULTS.has(detected) ? detected : 'WRONG_ANSWER';
     state.submissionResultAutoDetected = true;
+
+    // 수동으로 칩을 골랐을 때(handleSubmissionResultSelect)와 동일하게 입력창에
+    // 질문을 채워준다. 단, 사용자가 이미 뭔가 입력해 둔 상태라면 덮어쓰지 않는다.
+    if (!state.input) {
+      const opt = SUBMISSION_RESULT_OPTIONS.find((o) => o.value === state.submissionResult);
+      if (opt) {
+        state.input = opt.whyQuestion;
+        state.activeChip = opt.whyLabel;
+      }
+    }
   }
   const sourceLabel = gradingResult.source === 'run' ? '코드 실행' : '채점 결과';
   const resultLabel = SUBMISSION_RESULT_OPTIONS.find((o) => o.value === state.submissionResult)?.label ?? '오답';
