@@ -971,7 +971,7 @@ function bindEvents() {
     });
 
     questionInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && !event.isComposing) {
+      if (event.key === 'Enter' && !event.isComposing && !event.shiftKey) {
         event.preventDefault();
         handleSend();
       }
