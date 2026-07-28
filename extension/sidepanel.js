@@ -4,6 +4,11 @@ const DEFAULT_API_CONFIG = {
   endpoint: '/api/hint',
 };
 
+const LEGACY_LOCAL_API_BASE_URLS = new Set([
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+]);
+
 const DEFAULT_PROBLEM_ID = 1829;
 
 const AVATAR_URL = chrome.runtime.getURL('cotea.svg');
@@ -260,7 +265,10 @@ function applyAuthState(authState) {
 }
 
 function normalizeApiBaseUrl() {
-  return (state.apiConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+  const baseUrl = (state.apiConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+  return LEGACY_LOCAL_API_BASE_URLS.has(baseUrl)
+    ? DEFAULT_API_CONFIG.baseUrl
+    : baseUrl;
 }
 
 function randomState() {
@@ -1308,7 +1316,7 @@ async function fetchRecommendations() {
   }
 
   const problemId = state.problemId || DEFAULT_PROBLEM_ID;
-  const baseUrl = ((state.apiConfig && state.apiConfig.baseUrl) || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+  const baseUrl = normalizeApiBaseUrl();
   state.busy = true;
   renderShell();
 
