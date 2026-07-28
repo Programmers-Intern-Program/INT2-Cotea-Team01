@@ -736,7 +736,7 @@ button {
   gap: 8px;
   margin: 0 14px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: 18px;
   background: #f1f4f9;
   border: 1.5px solid rgba(27, 42, 74, 0.14);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
