@@ -5,6 +5,11 @@ const DEFAULT_API_CONFIG = {
   endpoint: '/api/hint',
 };
 
+const LEGACY_LOCAL_API_BASE_URLS = new Set([
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+]);
+
 const DEFAULT_PROBLEM_ID = 1829;
 const HINT_API_TIMEOUT_MS = 20000;
 const AUTH_API_TIMEOUT_MS = 15000;
@@ -81,7 +86,10 @@ function withTimeout(ms) {
 
 function normalizeApiBaseUrl(apiConfig) {
   const mergedConfig = { ...DEFAULT_API_CONFIG, ...(apiConfig || {}) };
-  return (mergedConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+  const baseUrl = (mergedConfig.baseUrl || DEFAULT_API_CONFIG.baseUrl).replace(/\/$/, '');
+  return LEGACY_LOCAL_API_BASE_URLS.has(baseUrl)
+    ? DEFAULT_API_CONFIG.baseUrl
+    : baseUrl;
 }
 
 async function fetchJson(url, options = {}, timeoutMs = AUTH_API_TIMEOUT_MS) {
@@ -230,7 +238,7 @@ async function requestHintFromApi(message) {
     return buildMockAnswer(questionText, hintRequest.userCode || message.code);
   }
 
-  const normalizedBaseUrl = mergedConfig.baseUrl.replace(/\/$/, '');
+  const normalizedBaseUrl = normalizeApiBaseUrl(mergedConfig);
   const normalizedEndpoint = mergedConfig.endpoint.startsWith('/')
     ? mergedConfig.endpoint
     : `/${mergedConfig.endpoint}`;
