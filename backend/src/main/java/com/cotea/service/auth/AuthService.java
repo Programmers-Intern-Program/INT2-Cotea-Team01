@@ -30,9 +30,7 @@ public class AuthService {
         validateKakaoClientId();
         String authorizeUrl = buildKakaoAuthorizeUrl(redirectUri, state);
 
-        return KakaoAuthorizeUrlResponse.builder()
-                .authorizeUrl(authorizeUrl)
-                .build();
+        return new KakaoAuthorizeUrlResponse(authorizeUrl);
     }
 
     private String buildKakaoAuthorizeUrl(String redirectUri, String state) {
