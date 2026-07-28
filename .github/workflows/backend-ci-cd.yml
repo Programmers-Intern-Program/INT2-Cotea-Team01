@@ -105,14 +105,38 @@ jobs:
             echo "Executable Spring Boot jar was not found under build/libs."
             exit 1
           fi
+          JAR_PATH="$(readlink -f "${JAR_PATH}")"
 
           if systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
             sudo systemctl restart "${SERVICE_NAME}"
             sudo systemctl status "${SERVICE_NAME}" --no-pager
+            curl --fail --silent --show-error --max-time 10 http://localhost:8080
             exit 0
           fi
 
-          pkill -f "${DEPLOY_DIR}/backend/build/libs/.*\\.jar" || true
+          pkill -f "cotea-backend-.*\\.jar" || true
+          for _ in $(seq 1 10); do
+            if ! pgrep -f "cotea-backend-.*\\.jar" > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if pgrep -f "cotea-backend-.*\\.jar" > /dev/null; then
+            echo "Existing cotea backend process did not stop."
+            exit 1
+          fi
+
           nohup env SPRING_PROFILES_ACTIVE="${SPRING_PROFILE}" java -jar "${JAR_PATH}" \
             > "${DEPLOY_DIR}/backend/application.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 3 http://localhost:8080; then
+              echo "Cotea backend started successfully."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Cotea backend did not become healthy in time."
+          tail -n 120 "${DEPLOY_DIR}/backend/application.log" || true
+          exit 1
           EOF
