@@ -6,7 +6,7 @@ const DEFAULT_API_CONFIG = {
 
 const DEFAULT_PROBLEM_ID = 1829;
 
-const AVATAR_URL = chrome.runtime.getURL('mascot.png');
+const AVATAR_URL = chrome.runtime.getURL('cotea.svg');
 
 const STAGE_OPTIONS = [
   { value: 'BEFORE_SOLVE', label: '도전', colorClass: 'stage-before-solve' },
