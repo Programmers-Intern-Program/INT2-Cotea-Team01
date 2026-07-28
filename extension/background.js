@@ -1,7 +1,7 @@
 // background.js
 const DEFAULT_API_CONFIG = {
   mode: 'api',
-  baseUrl: 'http://localhost:8080',
+  baseUrl: 'http://52.79.82.43:8080',
   endpoint: '/api/hint',
 };
 
