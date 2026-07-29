@@ -15,6 +15,8 @@ public class HintRequestValidator {
             "AFTER_SOLVE"
     );
     private static final String SUPPORTED_LANGUAGE = "java";
+    /** 프론트(extension/sidepanel.js)의 입력창 maxlength와 동일한 값 - 우회 경로(API 직접 호출) 대비 최종 방어선. */
+    private static final int MAX_QUESTION_TEXT_LENGTH = 1500;
     private static final Set<String> QUESTION_TYPES = Set.of("BUTTON", "FREE_TEXT");
     private static final Set<String> HINT_BUTTONS = Set.of(
             "hint_level_1",
@@ -89,6 +91,13 @@ public class HintRequestValidator {
         if ("FREE_TEXT".equals(request.getQuestionType())) {
             if (isBlank(request.getQuestionText())) {
                 throw new CoteaException("MISSING_QUESTION_TEXT", "questionText가 필요합니다.", 400);
+            }
+            if (request.getQuestionText().length() > MAX_QUESTION_TEXT_LENGTH) {
+                throw new CoteaException(
+                        "QUESTION_TEXT_TOO_LONG",
+                        "questionText는 " + MAX_QUESTION_TEXT_LENGTH + "자를 초과할 수 없습니다.",
+                        400
+                );
             }
             return;
         }

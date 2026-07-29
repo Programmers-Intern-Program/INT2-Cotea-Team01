@@ -115,6 +115,24 @@ class HintRequestValidatorTest {
     }
 
     @Test
+    void acceptsQuestionTextAtMaxLength() {
+        HintRequest request = baseRequest();
+        request.setQuestionType("FREE_TEXT");
+        request.setQuestionText("가".repeat(1500));
+
+        assertThatCode(() -> validator.validate(request)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsQuestionTextOverMaxLength() {
+        HintRequest request = baseRequest();
+        request.setQuestionType("FREE_TEXT");
+        request.setQuestionText("가".repeat(1501));
+
+        assertErrorCode(request, "QUESTION_TEXT_TOO_LONG");
+    }
+
+    @Test
     void requiresSubmissionResultForWrongAnswerStage() {
         HintRequest request = baseRequest();
         request.setStage("WRONG_ANSWER");

@@ -51,7 +51,7 @@
 | hintLevel           | int           | N (선택)                      | 1~4. `BEFORE_SOLVE`에서 사용하는 참고용 필터. **questionType과 독립적** — 특정 레벨을 선택한 상태에서도 자유 텍스트 입력 가능 |
 | questionType        | string (enum) | Y                             | `BUTTON`                                                                                                                      | `FREE_TEXT`                   |
 | buttonId            | string        | questionType=BUTTON일 때 Y    | 사전 정의 버튼 질문 ID. **목록은 [`button-catalog.md`](./button-catalog.md) 참고** |
-| questionText        | string        | questionType=FREE_TEXT일 때 Y | 사용자가 직접 입력한 질문                                                                                                     |
+| questionText        | string        | questionType=FREE_TEXT일 때 Y | 사용자가 직접 입력한 질문. 최대 1500자 — 초과 시 `400 QUESTION_TEXT_TOO_LONG`                                                |
 | userCode            | string        | Y                             | 현재 에디터에 작성된 코드 전체                                                                                                |
 | language            | string        | Y (`"java"`만 허용, 대소문자 무관) | 에디터에서 감지된 코드 언어 (예: `"Java"`). 현재는 Java만 정식 지원 — 없거나 `"java"`와 정확히 일치(대소문자 무관)하지 않으면 `400 UNSUPPORTED_LANGUAGE`. 향후 지식 베이스 `code_signals` 매칭 등 언어별 분기 확장 시 허용 목록에 추가 예정 |
 | conversationHistory | array         | Y (없으면 빈 배열)            | 지금까지의 대화. `[{ role: "user"                                                                                             | "assistant", text: string }]` |
@@ -131,6 +131,7 @@
 - `400 MISSING_BUTTON_ID` — `questionType=BUTTON`인데 buttonId 누락
 - `400 INVALID_BUTTON_ID` — buttonId 값 오류 또는 현재 stage에서 사용할 수 없는 buttonId
 - `400 MISSING_QUESTION_TEXT` — `questionType=FREE_TEXT`인데 questionText 누락
+- `400 QUESTION_TEXT_TOO_LONG` — questionText가 1500자 초과
 - `400 MISSING_SUBMISSION_RESULT` — `stage=WRONG_ANSWER`인데 submissionResult 누락
 - `400 INVALID_SUBMISSION_RESULT` — submissionResult 값 오류 또는 오답 원인 버튼과 submissionResult 불일치
 - `429 AI_RATE_LIMITED` — Claude API 요청 한도 초과
