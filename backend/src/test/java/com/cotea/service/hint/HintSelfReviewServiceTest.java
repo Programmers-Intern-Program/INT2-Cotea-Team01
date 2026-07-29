@@ -20,11 +20,11 @@ class HintSelfReviewServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void returnsFinalAnswerFromReviewJson() throws Exception {
+    void returnsFinalAnswerWhenFirstReviewPasses() throws Exception {
         LlmClient llmClient = new StubLlmClient("""
                 {
-                  "passed": false,
-                  "violations": ["Lv1 금지어 포함"],
+                  "passed": true,
+                  "violations": [],
                   "finalAnswer": "선택지를 한 단계씩 넓혀보는 관점으로 바라보면 좋아요. 다음 상태는 어떻게 정의할 수 있을까요?"
                 }
                 """);
@@ -44,6 +44,82 @@ class HintSelfReviewServiceTest {
         );
 
         assertThat(result).isEqualTo("선택지를 한 단계씩 넓혀보는 관점으로 바라보면 좋아요. 다음 상태는 어떻게 정의할 수 있을까요?");
+    }
+
+    @Test
+    void retriesWithViolationFeedbackAndReturnsFixedAnswerWhenSecondAttemptPasses() throws Exception {
+        SequencedLlmClient llmClient = new SequencedLlmClient(List.of(
+                """
+                {
+                  "passed": false,
+                  "violations": ["Lv1 금지어 포함: BFS"],
+                  "finalAnswer": "BFS로 풀면 됩니다."
+                }
+                """,
+                """
+                {
+                  "passed": true,
+                  "violations": [],
+                  "finalAnswer": "다음 상태를 어떻게 정의할 수 있을지 생각해보면 좋아요."
+                }
+                """
+        ));
+        HintSelfReviewService service = new HintSelfReviewService(
+                llmClient,
+                objectMapper,
+                new QuestionResolver()
+        );
+
+        String result = service.reviewAndFix(
+                policy(),
+                beforeSolveRequest(),
+                1,
+                "user message",
+                "이 문제는 BFS로 보면 좋아요.",
+                GuardrailResult.review(List.of("Lv1 금지어 포함: BFS"))
+        );
+
+        assertThat(result).isEqualTo("다음 상태를 어떻게 정의할 수 있을지 생각해보면 좋아요.");
+        assertThat(llmClient.callCount()).isEqualTo(2);
+        assertThat(llmClient.lastUserMessage()).contains("1차 검수에서 지적된 위반 사항");
+        assertThat(llmClient.lastUserMessage()).contains("Lv1 금지어 포함: BFS");
+    }
+
+    @Test
+    void fallsBackToSafeAnswerWhenBothAttemptsFail() throws Exception {
+        SequencedLlmClient llmClient = new SequencedLlmClient(List.of(
+                """
+                {
+                  "passed": false,
+                  "violations": ["Lv1 금지어 포함: BFS"],
+                  "finalAnswer": "BFS로 풀면 됩니다."
+                }
+                """,
+                """
+                {
+                  "passed": false,
+                  "violations": ["Lv1 금지어 포함: BFS"],
+                  "finalAnswer": "그래도 BFS로 풀면 됩니다."
+                }
+                """
+        ));
+        HintSelfReviewService service = new HintSelfReviewService(
+                llmClient,
+                objectMapper,
+                new QuestionResolver()
+        );
+
+        String result = service.reviewAndFix(
+                policy(),
+                beforeSolveRequest(),
+                1,
+                "user message",
+                "이 문제는 BFS로 보면 좋아요.",
+                GuardrailResult.review(List.of("Lv1 금지어 포함: BFS"))
+        );
+
+        assertThat(result).isEqualTo(HintSelfReviewService.SAFE_FALLBACK_ANSWER);
+        assertThat(llmClient.callCount()).isEqualTo(2);
     }
 
     @Test
@@ -151,6 +227,37 @@ class HintSelfReviewServiceTest {
         @Override
         public String generate(String systemPrompt, List<ConversationMessage> history, String userMessage) {
             return response;
+        }
+    }
+
+    /**
+     * 호출 순서대로 서로 다른 응답을 돌려주는 스텁. 1차 검수 실패 → 위반 피드백 재시도
+     * 흐름에서, 재시도 호출의 입력(userMessage)에 실제로 위반 피드백이 담기는지, 그리고
+     * 몇 번 호출됐는지를 검증하기 위해 사용한다.
+     */
+    private static final class SequencedLlmClient implements LlmClient {
+        private final List<String> responses;
+        private int index = 0;
+        private String lastUserMessage;
+
+        private SequencedLlmClient(List<String> responses) {
+            this.responses = responses;
+        }
+
+        @Override
+        public String generate(String systemPrompt, List<ConversationMessage> history, String userMessage) {
+            lastUserMessage = userMessage;
+            String response = responses.get(Math.min(index, responses.size() - 1));
+            index++;
+            return response;
+        }
+
+        int callCount() {
+            return index;
+        }
+
+        String lastUserMessage() {
+            return lastUserMessage;
         }
     }
 }

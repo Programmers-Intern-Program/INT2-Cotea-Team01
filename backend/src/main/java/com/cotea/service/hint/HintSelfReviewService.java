@@ -4,6 +4,10 @@ import com.cotea.client.LlmClient;
 import com.cotea.controller.dto.HintRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -13,6 +17,13 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class HintSelfReviewService {
+
+    /**
+     * 1차 검수(passed=false)와 위반 피드백을 반영한 재시도(passed=false)까지 모두 실패했을 때
+     * 사용자에게 보여줄 안전한 대체 응답. 내부 판정 실패 사실을 노출하지 않는다.
+     */
+    static final String SAFE_FALLBACK_ANSWER =
+            "지금은 안전한 형태로 답변을 정리하지 못했어요. 질문을 조금 더 구체적으로 다시 말씀해 주시겠어요?";
 
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
@@ -31,7 +42,27 @@ public class HintSelfReviewService {
                 null,
                 buildReviewUserMessage(policy, request, hintLevel, userMessage, draftAnswer, guardrail)
         );
-        return parseFinalAnswer(reviewResponse, draftAnswer);
+        Optional<ReviewOutcome> outcome = parseReviewOutcome(reviewResponse);
+        if (outcome.isEmpty()) {
+            return draftAnswer;
+        }
+        if (outcome.get().passed()) {
+            return outcome.get().finalAnswer();
+        }
+
+        log.warn("[SELF_REVIEW] 1차 검수 실패, 위반 피드백을 반영해 재시도합니다. violations={}", outcome.get().violations());
+        String retryResponse = llmClient.generate(
+                buildReviewSystemPrompt(policy),
+                null,
+                buildRetryUserMessage(policy, request, hintLevel, userMessage, draftAnswer, guardrail, outcome.get().violations())
+        );
+        Optional<ReviewOutcome> retryOutcome = parseReviewOutcome(retryResponse);
+        if (retryOutcome.isPresent() && retryOutcome.get().passed()) {
+            return retryOutcome.get().finalAnswer();
+        }
+
+        log.warn("[SELF_REVIEW] 재시도도 실패해 안전 응답으로 대체합니다.");
+        return SAFE_FALLBACK_ANSWER;
     }
 
     private String buildReviewSystemPrompt(JsonNode policy) {
@@ -113,26 +144,53 @@ public class HintSelfReviewService {
         );
     }
 
-    private String parseFinalAnswer(String reviewResponse, String fallbackAnswer) {
+    /**
+     * 1차 검수에서 passed=false가 나왔을 때, 지적된 위반 사항을 명시적으로 피드백으로 넣어
+     * 같은 초안을 다시 검토하게 한다. 막연한 재시도가 아니라 "이전에 이런 이유로 실패했다"는
+     * 근거를 함께 주어야 같은 실수를 반복할 위험이 줄어든다.
+     */
+    private String buildRetryUserMessage(
+            JsonNode policy,
+            HintRequest request,
+            int hintLevel,
+            String userMessage,
+            String draftAnswer,
+            GuardrailResult guardrail,
+            List<String> previousViolations
+    ) {
+        String base = buildReviewUserMessage(policy, request, hintLevel, userMessage, draftAnswer, guardrail);
+        String violationsText = previousViolations.isEmpty()
+                ? "- (구체적 위반 사유 없음, 정책 전반을 다시 점검할 것)"
+                : previousViolations.stream().map(v -> "- " + v).collect(Collectors.joining("\n"));
+        return base + """
+
+                ## 1차 검수에서 지적된 위반 사항 (이번에는 반드시 고쳐서 finalAnswer에 반영할 것)
+                %s
+                """.formatted(violationsText);
+    }
+
+    private Optional<ReviewOutcome> parseReviewOutcome(String reviewResponse) {
         try {
             JsonNode root = objectMapper.readTree(extractJson(reviewResponse));
             logReviewOutcome(root);
             String finalAnswer = root.path("finalAnswer").asText();
             if (finalAnswer == null || finalAnswer.isBlank()) {
                 log.warn("Self-review response did not include finalAnswer.");
-                return fallbackAnswer;
+                return Optional.empty();
             }
-            return finalAnswer.trim();
+            boolean passed = root.path("passed").asBoolean(true);
+            List<String> violations = new ArrayList<>();
+            root.path("violations").forEach(node -> violations.add(node.asText()));
+            return Optional.of(new ReviewOutcome(passed, violations, finalAnswer.trim()));
         } catch (Exception e) {
             log.warn("Failed to parse self-review response. Returning draft answer.", e);
-            return fallbackAnswer;
+            return Optional.empty();
         }
     }
 
     /**
-     * 재검수 결과(passed/violations)를 동작에는 반영하지 않고 관측용으로만 남긴다.
-     * 실제로 passed:false가 얼마나 자주 나오는지 데이터가 쌓이면, report05 2번 항목의
-     * A/B/C 정책 결정에 참고한다. logs/cotea.log(전체)와 logs/self-review.log(이 로그만) 양쪽에 남는다.
+     * 재검수 결과(passed/violations)를 관측용으로 로그에 남긴다. logs/cotea.log(전체)와
+     * logs/self-review.log(이 로그만) 양쪽에 남는다.
      */
     private void logReviewOutcome(JsonNode root) {
         try {
@@ -159,5 +217,8 @@ public class HintSelfReviewService {
             return value;
         }
         return value.substring(start, end + 1);
+    }
+
+    private record ReviewOutcome(boolean passed, List<String> violations, String finalAnswer) {
     }
 }
