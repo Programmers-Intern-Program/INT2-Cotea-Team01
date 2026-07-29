@@ -11,6 +11,11 @@ const LEGACY_LOCAL_API_BASE_URLS = new Set([
 
 const DEFAULT_PROBLEM_ID = 1829;
 
+// Fix/fe#153 - 질문 입력창 글자 수 제한. 한글/영어 구분 없이 문자 수로 센다
+// (String.length는 완성형 한글 음절도 영문자와 동일하게 1자로 센다).
+const QUESTION_MAX_LENGTH = 1500;
+const QUESTION_LENGTH_WARNING_THRESHOLD = 1200;
+
 const AVATAR_URL = chrome.runtime.getURL('cotea.svg');
 
 const STAGE_OPTIONS = [
@@ -148,6 +153,21 @@ function syncProblemAnalyzingNotice() {
   } else if (!shouldShow && hasNotice) {
     state.messages = state.messages.filter((message) => !message.analyzingNotice);
   }
+}
+
+// textarea에 maxlength를 걸어두면 평소엔 이 이상 입력이 안 되지만, 혹시 다른
+// 경로(예: 향후 프리필 로직)로 state.input이 더 길게 채워지는 경우까지 대비한
+// 방어선 - 전송 버튼 비활성화 조건에도 같이 걸어둔다.
+function isQuestionTooLong() {
+  return state.input.length > QUESTION_MAX_LENGTH;
+}
+
+function renderComposerHelpText() {
+  const remaining = QUESTION_MAX_LENGTH - state.input.length;
+  if (remaining <= QUESTION_MAX_LENGTH - QUESTION_LENGTH_WARNING_THRESHOLD) {
+    return `Enter로 전송 · ${Math.max(remaining, 0)}자 남았어요`;
+  }
+  return 'Enter로 전송 · Cotea는 실수할 수 있어요';
 }
 
 function pushStageDivider(label) {
@@ -913,17 +933,17 @@ function renderShell() {
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
+              <textarea id="question-input" rows="1" maxlength="${QUESTION_MAX_LENGTH}" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
               ${isActiveChipUnedited() ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
-            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>
+            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() || isQuestionTooLong() ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
             </button>
           </div>
 
           <div class="composer-help">
             <span class="return-icon">↵</span>
-            <p>Enter로 전송 · Cotea는 실수할 수 있어요</p>
+            <p class="${state.input.length >= QUESTION_LENGTH_WARNING_THRESHOLD ? 'char-limit-warning' : ''}">${renderComposerHelpText()}</p>
           </div>
         </div>
         `}
@@ -1433,7 +1453,7 @@ async function fetchRecommendations() {
 async function handleSend() {
   const question = state.input.trim();
   const chipLabel = state.activeChip;
-  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady()) {
+  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() || isQuestionTooLong()) {
     return;
   }
 
