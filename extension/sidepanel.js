@@ -139,7 +139,7 @@ function syncProblemAnalyzingNotice() {
     state.messages.push({
       id: Date.now(),
       role: 'ai',
-      text: '문제를 분석하고 있어요. 잠시만 기다려주세요...',
+      text: '문제 분석 중! 잠시만 기다려주세요.',
       timestamp: nowLabel(),
       analyzingNotice: true,
     });
@@ -529,6 +529,8 @@ function renderMessage(message) {
     : '';
   const bubbleBody = message.glow
     ? '<div class="typing-row"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">분석 중이에요...</span></div>'
+    : message.analyzingNotice
+    ? `<div class="analyzing-row"><svg class="analyzing-spinner" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg><span class="typing-label">${escapeHtml(message.text)}</span></div>`
     : `${renderRichText(message.text)}${message.code ? renderCodeBlock(message.code.src, message.code.hl) : ''}${recommendationCards}`;
 
   return `
@@ -639,7 +641,7 @@ function renderComposerPlaceholder() {
     return `현재 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요`;
   }
   if (isProblemAnalyzing()) {
-    return '문제를 분석하고 있어요, 잠시만 기다려주세요...';
+    return '문제 분석 중! 잠시만 기다려주세요.';
   }
   if (!state.stage) {
     return '먼저 위에서 지금 상태를 선택해주세요';
