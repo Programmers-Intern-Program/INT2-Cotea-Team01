@@ -291,6 +291,30 @@ async function requestHintFromApi(message) {
   };
 }
 
+// sidepanel이 이 값을 보고 분석이 끝나기 전까지 채팅 입력을 막는다(Fix/fe#152).
+// problemId를 키로 하는 맵으로 저장한다 - 단일 { problemId, status } 객체로 두면
+// 처음 보는 문제 두 개를 연달아 열었을 때(둘 다 아직 pending인 상태) 나중 문제의
+// pending 기록이 먼저 문제의 완료 기록에 덮어써져서, 아직 생성 중인 문제인데도
+// 채팅 입력이 풀려버리는 문제가 있었다.
+//
+// read-modify-write라 그 자체로는 원자적이지 않다 - 새 탭 두 개를 거의 동시에 열어서
+// ensureProblemReady가 겹쳐 호출되면, 두 호출의 getLocalState가 서로의 write보다
+// 먼저 끝나 한쪽 기록이 사라질 수 있다. background.js는 단일 스레드이므로
+// problemReadyStatusWriteQueue로 모든 쓰기를 한 줄로 직렬화해 이 경합을 막는다.
+let problemReadyStatusWriteQueue = Promise.resolve();
+
+function setProblemReadyStatus(problemId, status) {
+  problemReadyStatusWriteQueue = problemReadyStatusWriteQueue
+    .catch(() => {}) // 이전 쓰기가 실패해도 이후 쓰기가 큐에서 계속 진행되게 한다
+    .then(async () => {
+      const { problemReadyStatus } = await getLocalState({ problemReadyStatus: {} });
+      await setLocalState({
+        problemReadyStatus: { ...(problemReadyStatus || {}), [problemId]: status },
+      });
+    });
+  return problemReadyStatusWriteQueue;
+}
+
 async function ensureProblemReady(problemId) {
   if (problemId == null) {
     return;
@@ -306,6 +330,8 @@ async function ensureProblemReady(problemId) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ENSURE_PROBLEM_READY_TIMEOUT_MS);
 
+  await setProblemReadyStatus(problemId, 'pending');
+
   try {
     const response = await fetch(`${baseUrl}/api/problems/${problemId}/ensure-ready`, {
       method: 'POST',
@@ -313,11 +339,14 @@ async function ensureProblemReady(problemId) {
     });
     if (!response.ok) {
       console.error('[Cotea] ensure-ready 요청 실패:', response.status);
+      await setProblemReadyStatus(problemId, 'error');
       return;
     }
     console.log('[Cotea] ensure-ready 완료:', problemId);
+    await setProblemReadyStatus(problemId, 'ready');
   } catch (error) {
     console.error('[Cotea] ensure-ready 요청 오류:', error.message);
+    await setProblemReadyStatus(problemId, 'error');
   } finally {
     clearTimeout(timeoutId);
   }
@@ -425,6 +454,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       authState: null,
       codeDirty: false,
       gradingResult: null,
+      problemReadyStatus: {},
     })
       .then((state) => sendResponse(state))
       .catch((error) => {

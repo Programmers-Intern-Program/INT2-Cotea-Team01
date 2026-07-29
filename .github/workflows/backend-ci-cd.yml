@@ -107,36 +107,97 @@ jobs:
           fi
           JAR_PATH="$(readlink -f "${JAR_PATH}")"
 
-          if systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
-            sudo systemctl restart "${SERVICE_NAME}"
-            sudo systemctl status "${SERVICE_NAME}" --no-pager
-            curl --fail --silent --show-error --max-time 10 http://localhost:8080
-            exit 0
+          if ! command -v nginx > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y nginx
           fi
 
-          pkill -f "cotea-backend-.*\\.jar" || true
+          BLUE_PORT=8081
+          GREEN_PORT=8082
+          PROXY_PORT=8080
+          ACTIVE_PORT_FILE="${DEPLOY_DIR}/backend/.active-port"
+
+          ACTIVE_PORT=""
+          if [ -f "${ACTIVE_PORT_FILE}" ]; then
+            ACTIVE_PORT="$(cat "${ACTIVE_PORT_FILE}")"
+          fi
+
+          if [ "${ACTIVE_PORT}" = "${BLUE_PORT}" ]; then
+            NEXT_PORT="${GREEN_PORT}"
+          else
+            NEXT_PORT="${BLUE_PORT}"
+          fi
+
+          echo "Active port: ${ACTIVE_PORT:-none}; next port: ${NEXT_PORT}"
+
+          pkill -f "cotea-backend-.*\\.jar.*server.port=${NEXT_PORT}" || true
           for _ in $(seq 1 10); do
-            if ! pgrep -f "cotea-backend-.*\\.jar" > /dev/null; then
+            if ! pgrep -f "cotea-backend-.*\\.jar.*server.port=${NEXT_PORT}" > /dev/null; then
               break
             fi
             sleep 1
           done
-          if pgrep -f "cotea-backend-.*\\.jar" > /dev/null; then
-            echo "Existing cotea backend process did not stop."
-            exit 1
-          fi
 
           nohup env SPRING_PROFILES_ACTIVE="${SPRING_PROFILE}" java -jar "${JAR_PATH}" \
-            > "${DEPLOY_DIR}/backend/application.log" 2>&1 &
+            --server.port="${NEXT_PORT}" \
+            > "${DEPLOY_DIR}/backend/application-${NEXT_PORT}.log" 2>&1 &
+          NEW_PID=$!
+
           for _ in $(seq 1 30); do
-            if curl --fail --silent --show-error --max-time 3 http://localhost:8080; then
-              echo "Cotea backend started successfully."
-              exit 0
+            if curl --fail --silent --show-error --max-time 3 "http://localhost:${NEXT_PORT}"; then
+              echo "New backend is healthy on port ${NEXT_PORT}."
+              break
             fi
             sleep 2
           done
 
-          echo "Cotea backend did not become healthy in time."
-          tail -n 120 "${DEPLOY_DIR}/backend/application.log" || true
-          exit 1
+          if ! curl --fail --silent --show-error --max-time 3 "http://localhost:${NEXT_PORT}" > /dev/null; then
+            echo "New backend did not become healthy on port ${NEXT_PORT}."
+            tail -n 120 "${DEPLOY_DIR}/backend/application-${NEXT_PORT}.log" || true
+            kill "${NEW_PID}" || true
+            exit 1
+          fi
+
+          sudo tee /etc/nginx/conf.d/cotea-backend.conf > /dev/null <<NGINX_CONF
+          server {
+              listen ${PROXY_PORT};
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:${NEXT_PORT};
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+              }
+          }
+          NGINX_CONF
+
+          # First migration from direct 8080 jar to nginx: free the proxy port
+          # after the new backend is already healthy.
+          if [ -z "${ACTIVE_PORT}" ]; then
+            for pid in $(pgrep -f "java -jar .*cotea-backend-.*\\.jar" || true); do
+              if [ "${pid}" != "${NEW_PID}" ]; then
+                kill "${pid}" || true
+              fi
+            done
+            sleep 2
+          fi
+
+          sudo nginx -t
+          sudo systemctl enable nginx
+          if systemctl is-active --quiet nginx; then
+            sudo systemctl reload nginx
+          else
+            sudo systemctl start nginx
+          fi
+
+          curl --fail --silent --show-error --max-time 10 "http://localhost:${PROXY_PORT}"
+          echo "${NEXT_PORT}" > "${ACTIVE_PORT_FILE}"
+
+          if [ -n "${ACTIVE_PORT}" ] && [ "${ACTIVE_PORT}" != "${NEXT_PORT}" ]; then
+            pkill -f "cotea-backend-.*\\.jar.*server.port=${ACTIVE_PORT}" || true
+          fi
+
+          echo "Blue-Green deployment completed. Active port is now ${NEXT_PORT}."
           EOF
