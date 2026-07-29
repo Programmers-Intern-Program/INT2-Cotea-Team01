@@ -66,6 +66,8 @@ const state = {
   submissionResult: null,
   submissionResultAutoDetected: false,
   lastMessageStage: null,
+  // problemId를 키로 하는 맵 { [problemId]: 'pending'|'ready'|'error' } - background.js 참고
+  problemReadyStatus: {},
   // 대화가 진행 중인 상태에서 다른 문제로 이동한 걸 감지했을 때, 사용자가
   // "이전 대화 유지"/"새로 시작"을 고르기 전까지 여기에 새 문제 id를 잠깐 들고 있는다.
   pendingProblemSwitch: null,
@@ -114,6 +116,38 @@ function isComposerReady() {
   // 힌트 레벨/채점 결과는 세부 분류일 뿐이라, 상태(도전/오답)만 골랐으면
   // 자유 입력을 막지 않는다. 미선택 시 기본값 처리는 handleSend에서 한다.
   return Boolean(state.stage);
+}
+
+// background.js가 ensure-ready(문제 메타데이터 생성) 진행 중임을 storage에
+// 기록한 값을 본다 - 메타데이터가 없는 상태로 질문을 보내면 힌트 API가
+// 실패하므로(Fix/fe#152), 지금 보고 있는 문제에 대해 아직 pending이면 채팅을 막는다.
+// problemId별로 구분된 맵이라, 다른 문제를 먼저/나중에 열어봤어도 서로 덮어쓰지 않는다.
+function isProblemAnalyzing() {
+  return Boolean(
+    state.problemId != null
+    && state.problemReadyStatus
+    && state.problemReadyStatus[state.problemId] === 'pending'
+  );
+}
+
+// applyLanguageStatus와 같은 방식 - 분석 중일 때 대화창에도 안내 메시지를
+// 띄워서 입력창이 비활성화된 이유가 눈에 보이게 하고, 분석이 끝나면(ready/error)
+// 자동으로 걷어낸다. problemId/problemReadyStatus 둘 중 뭐가 바뀌어 호출됐든
+// 상관없이 현재 isProblemAnalyzing() 값만 보고 있는지/없는지를 맞춰주면 된다.
+function syncProblemAnalyzingNotice() {
+  const shouldShow = isProblemAnalyzing();
+  const hasNotice = state.messages.some((message) => message.analyzingNotice);
+  if (shouldShow && !hasNotice) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: '문제 분석 중! 잠시만 기다려주세요.',
+      timestamp: nowLabel(),
+      analyzingNotice: true,
+    });
+  } else if (!shouldShow && hasNotice) {
+    state.messages = state.messages.filter((message) => !message.analyzingNotice);
+  }
 }
 
 function pushStageDivider(label) {
@@ -497,6 +531,8 @@ function renderMessage(message) {
     : '';
   const bubbleBody = message.glow
     ? '<div class="typing-row"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">분석 중이에요...</span></div>'
+    : message.analyzingNotice
+    ? `<div class="analyzing-row"><svg class="analyzing-spinner" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg><span class="typing-label">${escapeHtml(message.text)}</span></div>`
     : `${renderRichText(message.text)}${message.code ? renderCodeBlock(message.code.src, message.code.hl) : ''}${recommendationCards}`;
 
   return `
@@ -606,6 +642,9 @@ function renderComposerPlaceholder() {
   if (state.languageNotSupported) {
     return `현재 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요`;
   }
+  if (isProblemAnalyzing()) {
+    return '문제 분석 중! 잠시만 기다려주세요.';
+  }
   if (!state.stage) {
     return '먼저 위에서 지금 상태를 선택해주세요';
   }
@@ -617,7 +656,7 @@ function renderStageSelector() {
     <div class="stage-select-row">
       ${STAGE_OPTIONS.map((opt) => {
         const active = state.stage === opt.value;
-        return `<button type="button" class="stage-chip ${active ? `active ${opt.colorClass}` : ''}" data-stage="${opt.value}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+        return `<button type="button" class="stage-chip ${active ? `active ${opt.colorClass}` : ''}" data-stage="${opt.value}" ${!state.onProgrammers || state.busy || isProblemAnalyzing() ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
       }).join('')}
     </div>
   `;
@@ -631,7 +670,7 @@ function renderHintLevelSelector() {
     <div class="sub-select-row hint-level-grid">
       ${HINT_LEVEL_OPTIONS.map((opt) => {
         const active = state.hintLevel === opt.hintLevel;
-        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${opt.icon}<span>${escapeHtml(opt.label)}</span></button>`;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy || isProblemAnalyzing() ? 'disabled' : ''}>${opt.icon}<span>${escapeHtml(opt.label)}</span></button>`;
       }).join('')}
     </div>
   `;
@@ -645,7 +684,7 @@ function renderSubmissionResultSelector() {
     <div class="sub-select-row">
       ${SUBMISSION_RESULT_OPTIONS.map((opt) => {
         const active = state.submissionResult === opt.value;
-        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-submission-result="${opt.value}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-submission-result="${opt.value}" ${!state.onProgrammers || state.busy || isProblemAnalyzing() ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
       }).join('')}
     </div>
   `;
@@ -874,10 +913,10 @@ function renderShell() {
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
+              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
               ${isActiveChipUnedited() ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
-            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady() ? 'disabled' : ''}>
+            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
             </button>
           </div>
@@ -1394,7 +1433,7 @@ async function fetchRecommendations() {
 async function handleSend() {
   const question = state.input.trim();
   const chipLabel = state.activeChip;
-  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady()) {
+  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady()) {
     return;
   }
 
@@ -1482,6 +1521,7 @@ function applyProblemSwitch(newProblemId, resetConversation) {
     state.lastMessageStage = null;
     ensureWelcomeMessage();
   }
+  syncProblemAnalyzingNotice();
   renderShell();
   syncPageContext().then(() => renderShell());
 }
@@ -1560,6 +1600,7 @@ async function initialize() {
     state.codeDirty = Boolean(response && response.codeDirty);
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
+    state.problemReadyStatus = (response && response.problemReadyStatus) || {};
 
     // 패널을 열기 전에 이미 코드 실행/채점을 해서 저장돼있던 결과가 있으면
     // 지금 막 감지된 것처럼 반영한다. 문제 ID 일치 여부는 applyGradingResult가 검사한다.
@@ -1593,6 +1634,8 @@ async function initialize() {
   if (pendingGradingResult) {
     applyGradingResult(pendingGradingResult);
   }
+
+  syncProblemAnalyzingNotice();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
     if (chrome.tabs.onActivated) {
@@ -1664,6 +1707,14 @@ async function initialize() {
     if (changes.gradingResult) {
       applyGradingResult(changes.gradingResult.newValue);
     }
+
+    if (changes.problemReadyStatus) {
+      state.problemReadyStatus = changes.problemReadyStatus.newValue || {};
+    }
+
+    // problemId/problemReadyStatus 중 이 배치에서 실제로 뭐가 바뀌었든, 지금
+    // 시점의 isProblemAnalyzing() 값에 맞춰 안내 메시지 유무를 다시 맞춘다.
+    syncProblemAnalyzingNotice();
 
     renderShell();
   });
