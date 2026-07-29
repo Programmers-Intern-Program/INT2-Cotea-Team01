@@ -848,6 +848,11 @@ button {
   font-size: 9.5px;
 }
 
+.composer-help p.char-limit-warning {
+  color: #ef4444;
+  font-weight: 700;
+}
+
 @media (max-width: 420px) {
   .message-stack {
     max-width: 84%;
