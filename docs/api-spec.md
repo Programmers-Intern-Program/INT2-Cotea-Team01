@@ -27,6 +27,7 @@
 - `MISSING_PROBLEM_ID` (400)
 - `INVALID_STAGE` (400)
 - `UNSUPPORTED_LANGUAGE` (400)
+- `REQUEST_BODY_TOO_LARGE` (413) — 요청 바디가 1MB 초과. 모든 엔드포인트 공통(`RequestBodySizeLimitFilter`), 컨트롤러에 도달하기 전 필터 단계에서 거부됨
 - `AI_SERVICE_ERROR` (500)
 
 **응답 방식**: **단일 JSON 응답 (확정).** 스트리밍(SSE)은 MVP 스코프 아님 — 힌트 텍스트 길이가 짧아 스트리밍 이득이 크지 않다고 판단.
