@@ -66,7 +66,8 @@ const state = {
   submissionResult: null,
   submissionResultAutoDetected: false,
   lastMessageStage: null,
-  problemReadyStatus: null,
+  // problemId를 키로 하는 맵 { [problemId]: 'pending'|'ready'|'error' } - background.js 참고
+  problemReadyStatus: {},
   // 대화가 진행 중인 상태에서 다른 문제로 이동한 걸 감지했을 때, 사용자가
   // "이전 대화 유지"/"새로 시작"을 고르기 전까지 여기에 새 문제 id를 잠깐 들고 있는다.
   pendingProblemSwitch: null,
@@ -120,11 +121,12 @@ function isComposerReady() {
 // background.js가 ensure-ready(문제 메타데이터 생성) 진행 중임을 storage에
 // 기록한 값을 본다 - 메타데이터가 없는 상태로 질문을 보내면 힌트 API가
 // 실패하므로(Fix/fe#152), 지금 보고 있는 문제에 대해 아직 pending이면 채팅을 막는다.
+// problemId별로 구분된 맵이라, 다른 문제를 먼저/나중에 열어봤어도 서로 덮어쓰지 않는다.
 function isProblemAnalyzing() {
   return Boolean(
-    state.problemReadyStatus
-    && state.problemReadyStatus.status === 'pending'
-    && state.problemReadyStatus.problemId === state.problemId
+    state.problemId != null
+    && state.problemReadyStatus
+    && state.problemReadyStatus[state.problemId] === 'pending'
   );
 }
 
@@ -1582,7 +1584,7 @@ async function initialize() {
     state.codeDirty = Boolean(response && response.codeDirty);
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
-    state.problemReadyStatus = (response && response.problemReadyStatus) || null;
+    state.problemReadyStatus = (response && response.problemReadyStatus) || {};
 
     // 패널을 열기 전에 이미 코드 실행/채점을 해서 저장돼있던 결과가 있으면
     // 지금 막 감지된 것처럼 반영한다. 문제 ID 일치 여부는 applyGradingResult가 검사한다.
@@ -1691,7 +1693,7 @@ async function initialize() {
     }
 
     if (changes.problemReadyStatus) {
-      state.problemReadyStatus = changes.problemReadyStatus.newValue || null;
+      state.problemReadyStatus = changes.problemReadyStatus.newValue || {};
     }
 
     // problemId/problemReadyStatus 중 이 배치에서 실제로 뭐가 바뀌었든, 지금
