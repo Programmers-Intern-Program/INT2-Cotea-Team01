@@ -66,6 +66,7 @@ const state = {
   submissionResult: null,
   submissionResultAutoDetected: false,
   lastMessageStage: null,
+  problemReadyStatus: null,
   // 대화가 진행 중인 상태에서 다른 문제로 이동한 걸 감지했을 때, 사용자가
   // "이전 대화 유지"/"새로 시작"을 고르기 전까지 여기에 새 문제 id를 잠깐 들고 있는다.
   pendingProblemSwitch: null,
@@ -114,6 +115,17 @@ function isComposerReady() {
   // 힌트 레벨/채점 결과는 세부 분류일 뿐이라, 상태(도전/오답)만 골랐으면
   // 자유 입력을 막지 않는다. 미선택 시 기본값 처리는 handleSend에서 한다.
   return Boolean(state.stage);
+}
+
+// background.js가 ensure-ready(문제 메타데이터 생성) 진행 중임을 storage에
+// 기록한 값을 본다 - 메타데이터가 없는 상태로 질문을 보내면 힌트 API가
+// 실패하므로(Fix/fe#152), 지금 보고 있는 문제에 대해 아직 pending이면 채팅을 막는다.
+function isProblemAnalyzing() {
+  return Boolean(
+    state.problemReadyStatus
+    && state.problemReadyStatus.status === 'pending'
+    && state.problemReadyStatus.problemId === state.problemId
+  );
 }
 
 function pushStageDivider(label) {
@@ -606,6 +618,9 @@ function renderComposerPlaceholder() {
   if (state.languageNotSupported) {
     return `현재 언어(${state.currentLanguage})는 미지원입니다. Java로 바꿔주세요`;
   }
+  if (isProblemAnalyzing()) {
+    return '문제를 분석하고 있어요, 잠시만 기다려주세요...';
+  }
   if (!state.stage) {
     return '먼저 위에서 지금 상태를 선택해주세요';
   }
@@ -617,7 +632,7 @@ function renderStageSelector() {
     <div class="stage-select-row">
       ${STAGE_OPTIONS.map((opt) => {
         const active = state.stage === opt.value;
-        return `<button type="button" class="stage-chip ${active ? `active ${opt.colorClass}` : ''}" data-stage="${opt.value}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+        return `<button type="button" class="stage-chip ${active ? `active ${opt.colorClass}` : ''}" data-stage="${opt.value}" ${!state.onProgrammers || state.busy || isProblemAnalyzing() ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
       }).join('')}
     </div>
   `;
@@ -631,7 +646,7 @@ function renderHintLevelSelector() {
     <div class="sub-select-row hint-level-grid">
       ${HINT_LEVEL_OPTIONS.map((opt) => {
         const active = state.hintLevel === opt.hintLevel;
-        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${opt.icon}<span>${escapeHtml(opt.label)}</span></button>`;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-hint-level="${opt.hintLevel}" ${!state.onProgrammers || state.busy || isProblemAnalyzing() ? 'disabled' : ''}>${opt.icon}<span>${escapeHtml(opt.label)}</span></button>`;
       }).join('')}
     </div>
   `;
@@ -645,7 +660,7 @@ function renderSubmissionResultSelector() {
     <div class="sub-select-row">
       ${SUBMISSION_RESULT_OPTIONS.map((opt) => {
         const active = state.submissionResult === opt.value;
-        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-submission-result="${opt.value}" ${!state.onProgrammers || state.busy ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
+        return `<button type="button" class="sub-chip ${active ? 'active' : ''}" data-submission-result="${opt.value}" ${!state.onProgrammers || state.busy || isProblemAnalyzing() ? 'disabled' : ''}>${escapeHtml(opt.label)}</button>`;
       }).join('')}
     </div>
   `;
@@ -874,10 +889,10 @@ function renderShell() {
 
           <div class="composer-row ${isActiveChipUnedited() ? 'caret-mode' : ''}">
             <div class="composer-input-wrap">
-              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
+              <textarea id="question-input" rows="1" placeholder="${escapeHtml(renderComposerPlaceholder())}" ${state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>${escapeHtml(state.input)}</textarea>
               ${isActiveChipUnedited() ? `<div class="fake-caret-layer"><span class="ghost-text">${escapeHtml(state.input)}</span><span class="fake-caret"></span></div>` : ''}
             </div>
-            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady() ? 'disabled' : ''}>
+            <button type="button" id="send-button" class="send-button" ${!state.input.trim() || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady() ? 'disabled' : ''}>
               <span class="send-arrow">↗</span>
             </button>
           </div>
@@ -1378,7 +1393,7 @@ async function fetchRecommendations() {
 async function handleSend() {
   const question = state.input.trim();
   const chipLabel = state.activeChip;
-  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || !isComposerReady()) {
+  if (!question || state.busy || !state.onProgrammers || state.languageNotSupported || isProblemAnalyzing() || !isComposerReady()) {
     return;
   }
 
@@ -1544,6 +1559,7 @@ async function initialize() {
     state.codeDirty = Boolean(response && response.codeDirty);
     state.languageNotSupported = Boolean(response && response.languageNotSupported);
     state.currentLanguage = (response && response.currentLanguage) || 'Java';
+    state.problemReadyStatus = (response && response.problemReadyStatus) || null;
 
     // 패널을 열기 전에 이미 코드 실행/채점을 해서 저장돼있던 결과가 있으면
     // 지금 막 감지된 것처럼 반영한다. 문제 ID 일치 여부는 applyGradingResult가 검사한다.
@@ -1647,6 +1663,10 @@ async function initialize() {
 
     if (changes.gradingResult) {
       applyGradingResult(changes.gradingResult.newValue);
+    }
+
+    if (changes.problemReadyStatus) {
+      state.problemReadyStatus = changes.problemReadyStatus.newValue || null;
     }
 
     renderShell();

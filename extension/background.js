@@ -306,6 +306,11 @@ async function ensureProblemReady(problemId) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ENSURE_PROBLEM_READY_TIMEOUT_MS);
 
+  // sidepanel이 이 값을 보고 분석이 끝나기 전까지 채팅 입력을 막는다
+  // (Fix/fe#152) - problemId를 같이 저장해 다른 문제로 넘어갔을 때 낡은
+  // pending 상태가 잘못 반영되지 않도록 한다.
+  await setLocalState({ problemReadyStatus: { problemId, status: 'pending' } });
+
   try {
     const response = await fetch(`${baseUrl}/api/problems/${problemId}/ensure-ready`, {
       method: 'POST',
@@ -313,11 +318,14 @@ async function ensureProblemReady(problemId) {
     });
     if (!response.ok) {
       console.error('[Cotea] ensure-ready 요청 실패:', response.status);
+      await setLocalState({ problemReadyStatus: { problemId, status: 'error' } });
       return;
     }
     console.log('[Cotea] ensure-ready 완료:', problemId);
+    await setLocalState({ problemReadyStatus: { problemId, status: 'ready' } });
   } catch (error) {
     console.error('[Cotea] ensure-ready 요청 오류:', error.message);
+    await setLocalState({ problemReadyStatus: { problemId, status: 'error' } });
   } finally {
     clearTimeout(timeoutId);
   }
@@ -425,6 +433,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       authState: null,
       codeDirty: false,
       gradingResult: null,
+      problemReadyStatus: null,
     })
       .then((state) => sendResponse(state))
       .catch((error) => {
