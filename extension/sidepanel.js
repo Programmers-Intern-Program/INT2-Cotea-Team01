@@ -128,6 +128,26 @@ function isProblemAnalyzing() {
   );
 }
 
+// applyLanguageStatus와 같은 방식 - 분석 중일 때 대화창에도 안내 메시지를
+// 띄워서 입력창이 비활성화된 이유가 눈에 보이게 하고, 분석이 끝나면(ready/error)
+// 자동으로 걷어낸다. problemId/problemReadyStatus 둘 중 뭐가 바뀌어 호출됐든
+// 상관없이 현재 isProblemAnalyzing() 값만 보고 있는지/없는지를 맞춰주면 된다.
+function syncProblemAnalyzingNotice() {
+  const shouldShow = isProblemAnalyzing();
+  const hasNotice = state.messages.some((message) => message.analyzingNotice);
+  if (shouldShow && !hasNotice) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: '문제를 분석하고 있어요. 잠시만 기다려주세요...',
+      timestamp: nowLabel(),
+      analyzingNotice: true,
+    });
+  } else if (!shouldShow && hasNotice) {
+    state.messages = state.messages.filter((message) => !message.analyzingNotice);
+  }
+}
+
 function pushStageDivider(label) {
   state.messages.push({ id: Date.now(), role: 'divider', text: label });
 }
@@ -1481,6 +1501,7 @@ function applyProblemSwitch(newProblemId, resetConversation) {
     state.lastMessageStage = null;
     ensureWelcomeMessage();
   }
+  syncProblemAnalyzingNotice();
   renderShell();
   syncPageContext().then(() => renderShell());
 }
@@ -1594,6 +1615,8 @@ async function initialize() {
     applyGradingResult(pendingGradingResult);
   }
 
+  syncProblemAnalyzingNotice();
+
   if (typeof chrome !== 'undefined' && chrome.tabs) {
     if (chrome.tabs.onActivated) {
       chrome.tabs.onActivated.addListener(refreshActiveTabStatus);
@@ -1668,6 +1691,10 @@ async function initialize() {
     if (changes.problemReadyStatus) {
       state.problemReadyStatus = changes.problemReadyStatus.newValue || null;
     }
+
+    // problemId/problemReadyStatus 중 이 배치에서 실제로 뭐가 바뀌었든, 지금
+    // 시점의 isProblemAnalyzing() 값에 맞춰 안내 메시지 유무를 다시 맞춘다.
+    syncProblemAnalyzingNotice();
 
     renderShell();
   });
