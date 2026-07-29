@@ -1044,6 +1044,22 @@ function handleStageSelect(value) {
   state.submissionResultAutoDetected = false;
   state.activeChip = null;
   state.input = '';
+
+  // 상위 버튼만 클릭하고 하위 옵션을 고르지 않은 채 질문을 보내면 서버가
+  // 어떤 힌트/사유를 원하는지 알 수 없으므로, 각 단계의 첫 하위 옵션을
+  // 기본값으로 함께 선택해준다 (handleHintLevelSelect/handleSubmissionResultSelect와 동일한 동작).
+  if (value === 'BEFORE_SOLVE') {
+    const defaultHint = HINT_LEVEL_OPTIONS[0];
+    state.hintLevel = defaultHint.hintLevel;
+    state.input = defaultHint.question;
+    state.activeChip = defaultHint.label;
+  } else if (value === 'WRONG_ANSWER') {
+    const defaultResult = SUBMISSION_RESULT_OPTIONS[0];
+    state.submissionResult = defaultResult.value;
+    state.input = defaultResult.whyQuestion;
+    state.activeChip = defaultResult.whyLabel;
+  }
+
   renderShell();
 }
 
