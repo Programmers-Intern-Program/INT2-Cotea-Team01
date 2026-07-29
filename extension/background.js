@@ -13,7 +13,9 @@ const LEGACY_LOCAL_API_BASE_URLS = new Set([
 const DEFAULT_PROBLEM_ID = 1829;
 const HINT_API_TIMEOUT_MS = 20000;
 const AUTH_API_TIMEOUT_MS = 15000;
-const ENSURE_PROBLEM_READY_TIMEOUT_MS = 150000; // 백엔드 쪽 문제 생성 타임아웃(120초)보다 여유 있게
+// ensure-ready/status 둘 다 이제 트리거·단발 조회일 뿐이라(실제 생성 완료까지 기다리지 않음),
+// 예전처럼 생성 시간(120초)에 맞춘 긴 타임아웃이 필요 없다. 90초짜리 폴링은 사이드패널이 한다.
+const PROBLEM_STATUS_REQUEST_TIMEOUT_MS = 10000;
 
 function isJavaLanguage(language) {
   // /java/i(부분 문자열 매칭)로는 "JavaScript"도 "Java"를 포함해 지원 언어로
@@ -297,24 +299,46 @@ async function requestHintFromApi(message) {
 // pending 기록이 먼저 문제의 완료 기록에 덮어써져서, 아직 생성 중인 문제인데도
 // 채팅 입력이 풀려버리는 문제가 있었다.
 //
-// read-modify-write라 그 자체로는 원자적이지 않다 - 새 탭 두 개를 거의 동시에 열어서
-// ensureProblemReady가 겹쳐 호출되면, 두 호출의 getLocalState가 서로의 write보다
-// 먼저 끝나 한쪽 기록이 사라질 수 있다. background.js는 단일 스레드이므로
-// problemReadyStatusWriteQueue로 모든 쓰기를 한 줄로 직렬화해 이 경합을 막는다.
+// 이 맵의 쓰기는 반드시 이 함수(그리고 이 스크립트) 하나로만 이뤄져야 한다 - get 후 set하는
+// 방식이라 원자적이지 않아서, 서로 다른 problemId에 대한 쓰기가 동시에(await 사이에) 겹치면
+// 나중 쓰기가 먼저 쓴 값을 통째로 덮어써 잃어버릴 수 있다(예: A→B→C→B처럼 여러 문제를 빠르게
+// 넘나들 때). writeQueue로 호출을 한 줄로 세워서 항상 한 번에 하나씩만 read-modify-write가
+// 끝나게 한다. 사이드패널도 직접 storage를 쓰지 않고 SET_PROBLEM_READY_STATUS 메시지로
+// 이 함수를 거치게 해서, 쓰는 주체를 이 스크립트 하나로 유지한다.
 let problemReadyStatusWriteQueue = Promise.resolve();
 
 function setProblemReadyStatus(problemId, status) {
-  problemReadyStatusWriteQueue = problemReadyStatusWriteQueue
-    .catch(() => {}) // 이전 쓰기가 실패해도 이후 쓰기가 큐에서 계속 진행되게 한다
-    .then(async () => {
-      const { problemReadyStatus } = await getLocalState({ problemReadyStatus: {} });
-      await setLocalState({
-        problemReadyStatus: { ...(problemReadyStatus || {}), [problemId]: status },
-      });
+  problemReadyStatusWriteQueue = problemReadyStatusWriteQueue.catch(() => {}).then(async () => {
+    const { problemReadyStatus } = await getLocalState({ problemReadyStatus: {} });
+    const next = { ...(problemReadyStatus || {}), [problemId]: status };
+    await setLocalState({
+      problemReadyStatus: next,
     });
+  });
   return problemReadyStatusWriteQueue;
 }
 
+// ensure-ready/status 요청 하나에 대한 타임아웃 적용 fetch. 둘 다 이제 트리거 또는
+// 단발 조회일 뿐이라 오래 걸리지 않는다(PROBLEM_STATUS_REQUEST_TIMEOUT_MS 위 주석 참고).
+async function fetchProblemApi(url, options) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PROBLEM_STATUS_REQUEST_TIMEOUT_MS);
+  try {
+    // status는 계속 값이 바뀌는 값이라 브라우저 캐시에 예전 응답(예: 아직 라우트가 없던
+    // 시절의 404)이 남아있으면 그걸 그대로 재사용해버린다 - 매번 실제 서버를 쳐야 한다.
+    return await fetch(url, { ...options, signal: controller.signal, cache: 'no-store' });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// problemId를 넘겨받으면 생성을 "트리거"만 하고 바로 리턴한다 - 서버는 이미 있는 문제가
+// 아니면 생성 작업을 자기 쪽 스레드풀에 던지기만 하고 즉시 202를 준다(실제 완료를 기다리지
+// 않음). 트리거 직후 상태를 한 번 조회해서, 이미 준비돼 있던 흔한 경우엔 pending 플래시 없이
+// 바로 ready로 넘어간다. 아직 GENERATING/NOT_STARTED면 여기서 더 기다리지 않고 pending인
+// 채로 둔다 - 이 스크립트는 MV3 서비스워커라 몇십 초씩 기다리는 폴링을 넣으면 중간에 죽을 수
+// 있어서, 그 몫(길게 기다렸다가 ready/error로 넘기는 것)은 사이드패널이 GET status를
+// 폴링해서 대신한다(사이드패널은 일반 페이지라 서비스워커처럼 강제 종료되지 않는다).
 async function ensureProblemReady(problemId) {
   if (problemId == null) {
     return;
@@ -327,28 +351,42 @@ async function ensureProblemReady(problemId) {
   }
 
   const baseUrl = normalizeApiBaseUrl(mergedConfig);
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), ENSURE_PROBLEM_READY_TIMEOUT_MS);
 
   await setProblemReadyStatus(problemId, 'pending');
 
   try {
-    const response = await fetch(`${baseUrl}/api/problems/${problemId}/ensure-ready`, {
+    const triggerResponse = await fetchProblemApi(`${baseUrl}/api/problems/${problemId}/ensure-ready`, {
       method: 'POST',
-      signal: controller.signal,
     });
-    if (!response.ok) {
-      console.error('[Cotea] ensure-ready 요청 실패:', response.status);
+    if (!triggerResponse.ok) {
+      // 서버가 반환한 에러 바디(ErrorResponse.message)까지 같이 남긴다 - status 코드만으로는
+      // 뭐가 터졌는지 전혀 알 수 없어서, 서버 로그 없이 이 콘솔만으로 원인을 좁힐 수 있게 한다.
+      let detail = '';
+      try {
+        const errorBody = await triggerResponse.json();
+        detail = errorBody && errorBody.message ? `: ${errorBody.message}` : '';
+      } catch (_error) {
+        // 바디가 JSON이 아니면 무시
+      }
+      console.error('[Cotea] ensure-ready 요청 실패:', triggerResponse.status, detail);
       await setProblemReadyStatus(problemId, 'error');
       return;
     }
-    console.log('[Cotea] ensure-ready 완료:', problemId);
-    await setProblemReadyStatus(problemId, 'ready');
+
+    const statusResponse = await fetchProblemApi(`${baseUrl}/api/problems/${problemId}/status`, {
+      method: 'GET',
+    });
+    if (statusResponse.ok) {
+      const { status } = await statusResponse.json();
+      if (status === 'READY') {
+        console.log('[Cotea] ensure-ready 완료:', problemId);
+        await setProblemReadyStatus(problemId, 'ready');
+      }
+      // GENERATING/NOT_STARTED면 pending 유지 - 사이드패널의 폴링이 이어받는다.
+    }
   } catch (error) {
     console.error('[Cotea] ensure-ready 요청 오류:', error.message);
     await setProblemReadyStatus(problemId, 'error');
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
@@ -405,6 +443,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'ENSURE_PROBLEM_READY') {
     // fire-and-forget: content.js는 응답을 기다리지 않음
     ensureProblemReady(message.problemId);
+  }
+
+  if (message.type === 'SET_PROBLEM_READY_STATUS') {
+    // 사이드패널이 GET status 폴링 결과(ready/error)를 반영할 때 이걸 거친다 -
+    // setProblemReadyStatus 위 주석 참고: 쓰기는 항상 이 스크립트 하나로만 모아야 한다.
+    // sendResponse를 안 부르고 return true도 안 하면 리스너가 동기적으로 끝나자마자
+    // 메시지 포트가 닫혀서, 호출한 쪽(sidepanel.js의 sendRuntimeMessage)이 "message port
+    // closed before a response was received"로 실패했다. pollProblemStatus가 READY를
+    // 받고도 이 예외 때문에 return을 못 하고 계속 돌다가, 결국 60초 타임아웃으로 방금 쓴
+    // 'ready'를 'error'로 덮어써버리는 버그가 있었다.
+    setProblemReadyStatus(message.problemId, message.status)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
   }
 
   if (message.type === 'GRADING_RESULT') {

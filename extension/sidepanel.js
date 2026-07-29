@@ -155,6 +155,30 @@ function syncProblemAnalyzingNotice() {
   }
 }
 
+// pollProblemStatus가 타임아웃으로 포기하면 problemReadyStatus가 'error'가 되는데, 이 경우
+// isProblemAnalyzing()이 false가 되면서 syncProblemAnalyzingNotice가 "분석 중" 안내를 조용히
+// 지우기만 해서, 사용자는 채팅이 왜 갑자기 풀렸는지 알 길이 없었다. 생성이 실제로 실패한 건지
+// 단순히 다른 문제들과 몰려서 늦어진 건지는 지금 구분할 수 없지만(서버가 FAILED 상태를 따로
+// 남기지 않음), 우선은 혼잡 가능성 + 새로고침 안내만 보여주기로 함(2026-07-30 논의).
+function syncProblemGenerationErrorNotice() {
+  const problemId = state.problemId;
+  const isError = problemId != null
+    && state.problemReadyStatus
+    && state.problemReadyStatus[problemId] === 'error';
+  const hasNotice = state.messages.some((message) => message.problemGenerationErrorNotice);
+  if (isError && !hasNotice) {
+    state.messages.push({
+      id: Date.now(),
+      role: 'ai',
+      text: '문제가 많이 몰려서 준비가 늦어지고 있어요. 페이지를 새로고침하면 해결될 수 있어요.',
+      timestamp: nowLabel(),
+      problemGenerationErrorNotice: true,
+    });
+  } else if (!isError && hasNotice) {
+    state.messages = state.messages.filter((message) => !message.problemGenerationErrorNotice);
+  }
+}
+
 // textarea에 maxlength를 걸어두면 평소엔 이 이상 입력이 안 되지만, 혹시 다른
 // 경로(예: 향후 프리필 로직)로 state.input이 더 길게 채워지는 경우까지 대비한
 // 방어선 - 전송 버튼 비활성화 조건에도 같이 걸어둔다.
@@ -168,6 +192,74 @@ function renderComposerHelpText() {
     return `Enter로 전송 · ${Math.max(remaining, 0)}자 남았어요`;
   }
   return 'Enter로 전송 · Cotea는 실수할 수 있어요';
+}
+
+const PROBLEM_STATUS_POLL_INTERVAL_MS = 5000;
+const PROBLEM_STATUS_POLL_TIMEOUT_MS = 90000;
+// 같은 problemId에 대해 폴링 루프가 중복으로 여러 개 도는 것을 막는다
+// (storage.onChanged와 initialize() 양쪽에서 시작을 시도할 수 있어서).
+const activeProblemStatusPolls = new Set();
+
+// storage의 problemReadyStatus 맵을 여기서 직접 get+set하지 않는다 - background.js도 같은
+// 맵을 쓰는데, get 후 set하는 방식이라 두 스크립트가 동시에 쓰면 나중 쓰기가 먼저 쓴 값을
+// 통째로 덮어써 잃어버릴 수 있다. background.js의 setProblemReadyStatus 하나로 쓰기를
+// 모아두는 게 안전해서, 여기서는 메시지로 위임만 한다.
+async function writeProblemReadyStatus(problemId, status) {
+  await sendRuntimeMessage({ type: 'SET_PROBLEM_READY_STATUS', problemId, status });
+}
+
+// background.js의 ensure-ready는 트리거 + 단발 상태 조회만 하고 끝난다(MV3
+// 서비스워커라 오래 기다리는 폴링을 넣으면 중간에 죽을 수 있어서). 그래서 실제로
+// 몇십 초씩 걸릴 수 있는 "생성 완료까지 기다리기"는 일반 페이지 컨텍스트인 이
+// 사이드패널이 맡는다 - GET status를 5초 간격으로 찔러보다가, 90초 넘도록
+// READY가 안 되면 포기하고 error로 넘긴다.
+function maybeStartProblemStatusPolling() {
+  const problemId = state.problemId;
+  if (problemId == null) {
+    return;
+  }
+  if (!state.problemReadyStatus || state.problemReadyStatus[problemId] !== 'pending') {
+    return;
+  }
+  if (activeProblemStatusPolls.has(problemId)) {
+    return;
+  }
+  activeProblemStatusPolls.add(problemId);
+  pollProblemStatus(problemId).finally(() => activeProblemStatusPolls.delete(problemId));
+}
+
+async function pollProblemStatus(problemId) {
+  const baseUrl = normalizeApiBaseUrl();
+  const deadline = Date.now() + PROBLEM_STATUS_POLL_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, PROBLEM_STATUS_POLL_INTERVAL_MS));
+
+    // 그 사이 다른 문제로 넘어갔으면 이 문제를 더 기다릴 이유가 없다.
+    if (state.problemId !== problemId) {
+      return;
+    }
+
+    try {
+      // background.js의 fetchProblemApi와 같은 이유로 캐시를 무시해야 한다 - 사이드패널은
+      // 서비스워커와 별도 캐시 파티션을 쓰는 것으로 보여서, 예전 404가 계속 재사용되고 있었다.
+      const response = await fetch(`${baseUrl}/api/problems/${problemId}/status`, { cache: 'no-store' });
+      if (response.ok) {
+        const { status } = await response.json();
+        if (status === 'READY') {
+          await writeProblemReadyStatus(problemId, 'ready');
+          return;
+        }
+      } else {
+        console.error('[Cotea] status 조회 실패:', response.status);
+      }
+    } catch (error) {
+      console.error('[Cotea] status 조회 오류:', error.message);
+    }
+  }
+
+  console.error('[Cotea] 문제 준비 대기 타임아웃:', problemId);
+  await writeProblemReadyStatus(problemId, 'error');
 }
 
 function pushStageDivider(label) {
@@ -1531,6 +1623,18 @@ function applyProblemSwitch(newProblemId, resetConversation) {
   state.problemId = newProblemId;
   state.problemTitle = null;
   state.pendingProblemSwitch = null;
+  // 이 문제가 'ready'로 확인된 적이 없으면 일단 pending을 기본값으로 깔고 새로 확인한다.
+  // - 한 번도 안 본 문제(undefined)면: background.js의 ENSURE_PROBLEM_READY 처리 결과가
+  //   storage를 거쳐 도착하기까지 메시지 전달 + storage 왕복만큼 지연이 있는데, 그 틈에
+  //   비어있는 값을 "안 막아도 됨"으로 잘못 해석해서 채팅이 풀려버리는 문제가 있었다.
+  // - 예전에 'error'였던 적이 있는 문제면: 그건 사이드패널이 90초 폴링을 포기한 시점의
+  //   스냅샷일 뿐, 서버 쪽 생성은 그 뒤로도 계속 진행됐을 수 있다(재시도 포함하면 90초보다
+  //   오래 걸리는 경우가 있음). 그 stale한 'error'를 그대로 믿으면 다시 그 문제를 열었을 때
+  //   실제로는 아직 준비 안 됐는데 채팅이 열려버린다. 그래서 'ready'만 신뢰하고, 나머지는
+  //   전부 다시 확인한다.
+  if (state.problemReadyStatus[newProblemId] !== 'ready') {
+    state.problemReadyStatus = { ...state.problemReadyStatus, [newProblemId]: 'pending' };
+  }
   if (resetConversation) {
     state.messages = [];
     state.stage = null;
@@ -1542,6 +1646,8 @@ function applyProblemSwitch(newProblemId, resetConversation) {
     ensureWelcomeMessage();
   }
   syncProblemAnalyzingNotice();
+  syncProblemGenerationErrorNotice();
+  maybeStartProblemStatusPolling();
   renderShell();
   syncPageContext().then(() => renderShell());
 }
@@ -1656,6 +1762,8 @@ async function initialize() {
   }
 
   syncProblemAnalyzingNotice();
+  syncProblemGenerationErrorNotice();
+  maybeStartProblemStatusPolling();
 
   if (typeof chrome !== 'undefined' && chrome.tabs) {
     if (chrome.tabs.onActivated) {
@@ -1735,6 +1843,8 @@ async function initialize() {
     // problemId/problemReadyStatus 중 이 배치에서 실제로 뭐가 바뀌었든, 지금
     // 시점의 isProblemAnalyzing() 값에 맞춰 안내 메시지 유무를 다시 맞춘다.
     syncProblemAnalyzingNotice();
+    syncProblemGenerationErrorNotice();
+    maybeStartProblemStatusPolling();
 
     renderShell();
   });
