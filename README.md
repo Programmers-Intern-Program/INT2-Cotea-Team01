@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="./extension/cotea.svg" alt="Cotea logo" width="140" />
 
-  # 코티 (Cotea)
-</div>
+<img src="./extension/cotea.svg" alt="Cotea logo" width="140" />
+
+# 코티 (Cotea)
 
 정답이 아닌 **"방향성"**을 제시하는, 프로그래머스 코딩테스트 전용 AI 튜터 크롬 익스텐션입니다.
 
@@ -15,6 +15,8 @@
   <img alt="Kakao" src="https://img.shields.io/badge/Login-Kakao%20OAuth-FEE500?style=flat-square&logo=kakaotalk&logoColor=black" />
   <img alt="AWS" src="https://img.shields.io/badge/Infra-AWS%20EC2-232F3E?style=flat-square&logo=amazonaws&logoColor=white" />
 </p>
+
+</div>
 
 ## 한 줄 소개
 
@@ -36,6 +38,17 @@
 - **문제·코드 자동 동기화**: 프로그래머스 문제 페이지에서 문제 정보와 작성 중인 코드를 실시간으로 수집
 - **카카오 로그인**: 카카오 OAuth로 로그인해 개인화된 학습 흐름 유지
 - **RAG 기반 힌트 생성**: 문제별 메타데이터 + 알고리즘 지식 베이스를 결합해 답변 생성
+
+## 스크린샷
+
+**오답 원인 진단** — 런타임 에러가 왜 났는지 코드 기준으로 짚어주되, 어떻게 고칠지는 직접 생각하도록 유도합니다.
+
+<img width="800" alt="런타임 에러 원인 진단 스크린샷" src="https://github.com/user-attachments/assets/2d2abbdb-057b-4d37-a18c-d981106bf97e" />
+
+**단계별 힌트** — "접근 힌트"는 어떤 관점으로 문제를 봐야 할지 되묻고, "구현 힌트"는 그 관점에서 실제 알고리즘을 어떻게 구조화할지 짚어줍니다.
+
+<img width="800" alt="접근 힌트 단계 스크린샷" src="https://github.com/user-attachments/assets/d6becd5b-b959-464e-9ba1-d1feff41ba38" />
+<img width="800" alt="구현 힌트 단계 스크린샷" src="https://github.com/user-attachments/assets/fe8e3ba2-93ed-4751-8eec-c7ee393db766" />
 
 ## 기술 스택
 
