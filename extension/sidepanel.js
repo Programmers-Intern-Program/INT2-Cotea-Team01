@@ -259,7 +259,15 @@ async function pollProblemStatus(problemId) {
   }
 
   console.error('[Cotea] 문제 준비 대기 타임아웃:', problemId);
-  await writeProblemReadyStatus(problemId, 'error');
+  // writeProblemReadyStatus는 background.js로 메시지를 보내는데, 그 시점에 서비스워커가
+  // 죽어있거나 포트가 닫혀 있으면 reject된다 - 루프 안의 'ready' 기록과 달리 여기서 감싸지
+  // 않으면 unhandled rejection으로 끝나면서 상태가 영영 'pending'에 머물러 채팅이 이유
+  // 없이 계속 잠겨있게 된다.
+  try {
+    await writeProblemReadyStatus(problemId, 'error');
+  } catch (error) {
+    console.error('[Cotea] 문제 준비 실패 상태 기록 오류:', error.message);
+  }
 }
 
 function pushStageDivider(label) {
