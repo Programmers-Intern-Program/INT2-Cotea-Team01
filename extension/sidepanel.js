@@ -1453,10 +1453,18 @@ async function dispatchHintRequest(hintRequest, displayText) {
       hintRequest,
     });
 
+    const answerText = response && response.answer ? response.answer : '응답을 받지 못했습니다.';
+    const authMessage = response && response.reauthRequired && response.authMessage
+      ? `\n\n${response.authMessage}`
+      : '';
+    if (response && response.reauthRequired) {
+      applyAuthState(null);
+    }
+
     state.messages.push({
       id: Date.now() + 1,
       role: 'ai',
-      text: response && response.answer ? response.answer : '응답을 받지 못했습니다.',
+      text: answerText + authMessage,
       suggestConceptDrill: Boolean(response && response.suggestConceptDrill),
       timestamp: nowLabel(),
     });

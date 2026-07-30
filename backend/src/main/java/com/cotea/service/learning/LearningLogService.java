@@ -3,6 +3,7 @@ package com.cotea.service.learning;
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.exception.CoteaException;
 import com.cotea.service.auth.JwtTokenProvider;
+import com.cotea.service.auth.UserRepository;
 import com.cotea.service.learning.entity.UserHintLogEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,6 +13,7 @@ import java.util.Iterator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -20,13 +22,14 @@ import org.springframework.stereotype.Service;
 public class LearningLogService {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
     private final UserHintLogRepository userHintLogRepository;
     private final WeaknessClassifier weaknessClassifier;
     private final ObjectMapper objectMapper;
 
-    public void saveIfAuthenticated(String authorization, HintRequest request, HintLogContext context) {
+    public SaveResult saveIfAuthenticated(String authorization, HintRequest request, HintLogContext context) {
         if (authorization == null || authorization.isBlank()) {
-            return;
+            return SaveResult.SKIPPED_NO_AUTH;
         }
 
         Long userId;
@@ -34,7 +37,11 @@ public class LearningLogService {
             userId = jwtTokenProvider.parseUserId(authorization);
         } catch (CoteaException e) {
             log.warn("Skip hint log because auth token is invalid: {}", e.getErrorCode());
-            return;
+            return SaveResult.REAUTH_REQUIRED;
+        }
+        if (!userRepository.existsById(userId)) {
+            log.warn("Skip hint log because token user does not exist: userId={}", userId);
+            return SaveResult.REAUTH_REQUIRED;
         }
 
         WeaknessClassification classification = weaknessClassifier.classify(
@@ -43,7 +50,7 @@ public class LearningLogService {
                 context.route()
         );
 
-        UserHintLogEntity log = UserHintLogEntity.create(new UserHintLogEntity.CreateCommand(
+        UserHintLogEntity hintLog = UserHintLogEntity.create(new UserHintLogEntity.CreateCommand(
                 userId,
                 request.getProblemId(),
                 context.problem().path("source").path("title").asText(""),
@@ -66,7 +73,19 @@ public class LearningLogService {
                 context.llmProvider(),
                 request.getSolved()
         ));
-        userHintLogRepository.save(log);
+        try {
+            userHintLogRepository.save(hintLog);
+            return SaveResult.SAVED;
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Skip hint log because user relation is invalid: userId={}", userId);
+            return SaveResult.REAUTH_REQUIRED;
+        }
+    }
+
+    public enum SaveResult {
+        SAVED,
+        SKIPPED_NO_AUTH,
+        REAUTH_REQUIRED
     }
 
     private Integer codeLength(String code) {
