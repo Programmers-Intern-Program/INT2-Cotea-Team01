@@ -70,6 +70,29 @@ class ProblemHtmlParserTest {
     }
 
     @Test
+    void upgradesHttpImageUrlsToHttps() {
+        String html = """
+                <html><body>
+                <div class="lesson-content" data-lesson-id="1829" data-lesson-title="카카오프렌즈 컬러링북" data-challenge-level="2">
+                  <div class="guide-section-description">
+                    <div class="markdown">
+                      <p>설명 텍스트</p>
+                      <img src="http://grepp-programmers.s3.ap-northeast-2.amazonaws.com/files/example1.png" alt="">
+                    </div>
+                  </div>
+                </div>
+                </body></html>
+                """;
+
+        ParsedProblem result = parser.parse(html);
+
+        // Claude의 image source.type="url"은 HTTPS만 허용하므로(400: "Only HTTPS URLs are
+        // supported."), http://로 된 원본 이미지도 https://로 올려서 넘겨야 한다.
+        assertThat(result.imageUrls()).containsExactly(
+                "https://grepp-programmers.s3.ap-northeast-2.amazonaws.com/files/example1.png");
+    }
+
+    @Test
     void throwsWhenLessonContentMissing() {
         assertThatThrownBy(() -> parser.parse("<html><body>엉뚱한 페이지</body></html>"))
                 .isInstanceOf(ProblemHtmlParseException.class)
