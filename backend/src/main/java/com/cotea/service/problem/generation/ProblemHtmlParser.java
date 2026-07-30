@@ -76,7 +76,15 @@ public class ProblemHtmlParser {
         Elements images = descriptionNode.select("img[src]");
         for (Element img : images) {
             String absoluteUrl = img.absUrl("src");
-            imageUrls.add(absoluteUrl.isBlank() ? img.attr("src") : absoluteUrl);
+            String url = absoluteUrl.isBlank() ? img.attr("src") : absoluteUrl;
+            // Claude의 image source.type="url"은 HTTPS만 허용한다("Only HTTPS URLs are
+            // supported." 400 에러). 문제 본문에 http:// 이미지가 하나만 섞여 있어도 해당
+            // 문제는 재시도해도 항상 생성이 실패해서, 여기서 스킴을 올려준다 — 대부분의
+            // 호스트가 같은 도메인에서 HTTPS도 지원하므로 안전한 편이다.
+            if (url.startsWith("http://")) {
+                url = "https://" + url.substring("http://".length());
+            }
+            imageUrls.add(url);
         }
         return imageUrls;
     }
