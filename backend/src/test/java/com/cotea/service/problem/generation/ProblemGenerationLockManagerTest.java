@@ -25,7 +25,7 @@ class ProblemGenerationLockManagerTest {
     @Test
     void acquiresLockWhenNoExistingRow() {
         when(lockRepository.findById(1829)).thenReturn(Optional.empty());
-        ProblemGenerationLockManager manager = new ProblemGenerationLockManager(lockRepository);
+        ProblemGenerationLockManager manager = newManager();
 
         boolean acquired = manager.tryAcquire(1829);
 
@@ -38,7 +38,7 @@ class ProblemGenerationLockManagerTest {
         when(lockRepository.findById(1829)).thenReturn(Optional.of(lockOf(1829, LocalDateTime.now())));
         doThrow(new DataIntegrityViolationException("duplicate"))
                 .when(lockRepository).insertLock(eq(1829), any(LocalDateTime.class));
-        ProblemGenerationLockManager manager = new ProblemGenerationLockManager(lockRepository);
+        ProblemGenerationLockManager manager = newManager();
 
         boolean acquired = manager.tryAcquire(1829);
 
@@ -50,7 +50,7 @@ class ProblemGenerationLockManagerTest {
     void reclaimsStaleLockBeforeAcquiring() {
         when(lockRepository.findById(1829))
                 .thenReturn(Optional.of(lockOf(1829, LocalDateTime.now().minusMinutes(10))));
-        ProblemGenerationLockManager manager = new ProblemGenerationLockManager(lockRepository);
+        ProblemGenerationLockManager manager = newManager();
 
         boolean acquired = manager.tryAcquire(1829);
 
@@ -71,5 +71,14 @@ class ProblemGenerationLockManagerTest {
 
     private ProblemGenerationLockEntity lockOf(int problemId, LocalDateTime startedAt) {
         return new ProblemGenerationLockEntity(problemId, startedAt);
+    }
+
+    // tryAcquire()는 REQUIRES_NEW 트랜잭션 격리를 위해 insertLockInNewTransaction()을
+    // self(스프링 프록시)를 거쳐 호출한다. 실제 스프링 컨테이너 밖의 단위 테스트에선 그
+    // 자기 자신 주입이 안 되니, 여기서 수동으로 채워서 tryAcquire()가 동작할 수 있게 한다.
+    private ProblemGenerationLockManager newManager() {
+        ProblemGenerationLockManager manager = new ProblemGenerationLockManager(lockRepository);
+        manager.self = manager;
+        return manager;
     }
 }

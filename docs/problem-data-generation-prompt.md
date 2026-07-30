@@ -11,7 +11,9 @@
 > 오케스트레이션은 `com.cotea.service.problem.generation` 패키지(`ProblemGenerationOrchestrator`,
 > `ProblemHtmlParser`, `ProblemGenerationValidator`, `GeneratedProblemMapper`,
 > `ProblemGenerationLockManager`)에 구현돼 있고, `POST /api/problems/{problemId}/ensure-ready`
-> (fire-and-forget, 문제 입장 시 호출)가 진입점이다.
+> (fire-and-forget, 문제 입장 시 호출, 즉시 202 Accepted 반환)가 진입점이다. 생성 완료 여부는
+> 이 응답만으로 알 수 없고, `GET /api/problems/{problemId}/status`
+> (READY/GENERATING/NOT_STARTED)를 클라이언트가 폴링해서 확인해야 한다.
 
 ## 1. 파이프라인 개요
 

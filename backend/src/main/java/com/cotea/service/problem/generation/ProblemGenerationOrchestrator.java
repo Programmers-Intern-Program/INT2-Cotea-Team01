@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -22,8 +23,10 @@ import org.springframework.util.StreamUtils;
  * 프롬프트에 첨부해 1회 재시도하고(§5 재시도 정책), 그래도 실패하면 락만 풀고 종료한다 — 다음
  * "문제 입장" 요청이 처음부터 다시 시도할 수 있게 한다.
  *
- * <p>프론트엔드는 이 서비스 호출 결과를 기다리지 않는(fire-and-forget) 것을 전제로 설계됐다 —
- * 그래서 이 클래스 어디에도 클라이언트 타임아웃을 고려한 코드가 없다.
+ * <p>{@code ensureReady()}는 생성 작업을 {@code problemGenerationExecutor}에 던지기만 하고
+ * 즉시 리턴한다(트리거 역할만 함) — 실제 생성 완료 여부는 {@link #getStatus(int)}를 폴링해서
+ * 확인해야 한다. 락을 못 잡은(= 다른 요청이 이미 생성 중인) 호출도, 이미 존재하는 문제에 대한
+ * 호출도 전부 이 방식으로 "완료 여부는 상태 조회로 확인" 하나로 수렴한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,6 +45,7 @@ public class ProblemGenerationOrchestrator {
     private final ProblemGenerationValidator validator;
     private final GeneratedProblemMapper mapper;
     private final ObjectMapper objectMapper;
+    private final ExecutorService problemGenerationExecutor;
 
     public void ensureReady(int problemId) {
         if (problemMetaRepository.existsById(problemId)) {
@@ -51,11 +55,23 @@ public class ProblemGenerationOrchestrator {
             log.info("problemId={} 이미 다른 요청이 생성 중", problemId);
             return;
         }
-        try {
-            generateWithRetry(problemId);
-        } finally {
-            lockManager.release(problemId);
+        problemGenerationExecutor.submit(() -> {
+            try {
+                generateWithRetry(problemId);
+            } finally {
+                lockManager.release(problemId);
+            }
+        });
+    }
+
+    public ProblemReadyStatus getStatus(int problemId) {
+        if (problemMetaRepository.existsById(problemId)) {
+            return ProblemReadyStatus.READY;
         }
+        if (lockManager.isInProgress(problemId)) {
+            return ProblemReadyStatus.GENERATING;
+        }
+        return ProblemReadyStatus.NOT_STARTED;
     }
 
     private void generateWithRetry(int problemId) {

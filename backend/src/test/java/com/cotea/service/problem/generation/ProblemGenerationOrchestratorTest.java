@@ -15,6 +15,9 @@ import com.cotea.service.problem.ProblemMetaRepository;
 import com.cotea.service.problem.entity.ProblemEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,12 +36,21 @@ class ProblemGenerationOrchestratorTest {
     @Mock private GeneratedProblemMapper mapper;
 
     private ProblemGenerationOrchestrator orchestrator;
+    /** ensureReady()가 생성 작업을 여기로 던지기만 하고 바로 리턴하므로, 완료를 검증하려는
+     * 테스트는 {@link #awaitGeneration()}으로 작업이 끝날 때까지 기다린 뒤 verify해야 한다. */
+    private ExecutorService generationExecutor;
 
     @BeforeEach
     void setUp() {
+        generationExecutor = Executors.newSingleThreadExecutor();
         orchestrator = new ProblemGenerationOrchestrator(
                 problemMetaRepository, lockManager, pageFetcher, htmlParser,
-                llmClient, validator, mapper, new ObjectMapper());
+                llmClient, validator, mapper, new ObjectMapper(), generationExecutor);
+    }
+
+    private void awaitGeneration() throws InterruptedException {
+        generationExecutor.shutdown();
+        generationExecutor.awaitTermination(2, TimeUnit.SECONDS);
     }
 
     @Test
@@ -63,7 +75,7 @@ class ProblemGenerationOrchestratorTest {
     }
 
     @Test
-    void generatesAndSavesOnSuccess() {
+    void generatesAndSavesOnSuccess() throws InterruptedException {
         when(problemMetaRepository.existsById(1829)).thenReturn(false);
         when(lockManager.tryAcquire(1829)).thenReturn(true);
         when(pageFetcher.fetchHtml(1829)).thenReturn("<html></html>");
@@ -74,13 +86,14 @@ class ProblemGenerationOrchestratorTest {
         when(mapper.toEntity(any())).thenReturn(entity);
 
         orchestrator.ensureReady(1829);
+        awaitGeneration();
 
         verify(problemMetaRepository).save(entity);
         verify(lockManager).release(1829);
     }
 
     @Test
-    void retriesOnceOnValidationFailureThenSucceeds() {
+    void retriesOnceOnValidationFailureThenSucceeds() throws InterruptedException {
         when(problemMetaRepository.existsById(1829)).thenReturn(false);
         when(lockManager.tryAcquire(1829)).thenReturn(true);
         when(pageFetcher.fetchHtml(1829)).thenReturn("<html></html>");
@@ -92,6 +105,7 @@ class ProblemGenerationOrchestratorTest {
         when(mapper.toEntity(any())).thenReturn(ProblemEntity.builder().problemId(1829).build());
 
         orchestrator.ensureReady(1829);
+        awaitGeneration();
 
         verify(llmClient, times(2)).generateWithImages(anyString(), anyString(), eq(List.of()));
         verify(problemMetaRepository, times(1)).save(any());
@@ -99,7 +113,7 @@ class ProblemGenerationOrchestratorTest {
     }
 
     @Test
-    void givesUpAfterMaxAttemptsButStillReleasesLock() {
+    void givesUpAfterMaxAttemptsButStillReleasesLock() throws InterruptedException {
         when(problemMetaRepository.existsById(1829)).thenReturn(false);
         when(lockManager.tryAcquire(1829)).thenReturn(true);
         when(pageFetcher.fetchHtml(1829)).thenReturn("<html></html>");
@@ -108,13 +122,14 @@ class ProblemGenerationOrchestratorTest {
         when(validator.validate(any(), eq(1829))).thenReturn(new ValidationResult(false, List.of("계속 실패")));
 
         orchestrator.ensureReady(1829);
+        awaitGeneration();
 
         verify(problemMetaRepository, never()).save(any());
         verify(lockManager).release(1829);
     }
 
     @Test
-    void passesImageUrlsThroughWhenProblemHasImages() {
+    void passesImageUrlsThroughWhenProblemHasImages() throws InterruptedException {
         when(problemMetaRepository.existsById(1829)).thenReturn(false);
         when(lockManager.tryAcquire(1829)).thenReturn(true);
         when(pageFetcher.fetchHtml(1829)).thenReturn("<html></html>");
@@ -127,8 +142,32 @@ class ProblemGenerationOrchestratorTest {
         when(mapper.toEntity(any())).thenReturn(ProblemEntity.builder().problemId(1829).build());
 
         orchestrator.ensureReady(1829);
+        awaitGeneration();
 
         verify(llmClient).generateWithImages(anyString(), anyString(), eq(List.of("https://example.com/image.png")));
+    }
+
+    @Test
+    void statusIsReadyWhenProblemExists() {
+        when(problemMetaRepository.existsById(1829)).thenReturn(true);
+
+        assertThat(orchestrator.getStatus(1829)).isEqualTo(ProblemReadyStatus.READY);
+    }
+
+    @Test
+    void statusIsGeneratingWhenLockInProgress() {
+        when(problemMetaRepository.existsById(1829)).thenReturn(false);
+        when(lockManager.isInProgress(1829)).thenReturn(true);
+
+        assertThat(orchestrator.getStatus(1829)).isEqualTo(ProblemReadyStatus.GENERATING);
+    }
+
+    @Test
+    void statusIsNotStartedWhenNeitherExistsNorLocked() {
+        when(problemMetaRepository.existsById(1829)).thenReturn(false);
+        when(lockManager.isInProgress(1829)).thenReturn(false);
+
+        assertThat(orchestrator.getStatus(1829)).isEqualTo(ProblemReadyStatus.NOT_STARTED);
     }
 
     private ParsedProblem textOnlyParsedProblem() {
