@@ -1,0 +1,39 @@
+# k6 메트릭 시각화용 (Prometheus + Grafana)
+# 사용: docker compose -f k6/docker-compose.yml up -d
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: cotea-k6-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=native-histograms
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - cotea-k6-prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: cotea-k6-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: dark
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - cotea-k6-grafana-data:/var/lib/grafana
+
+volumes:
+  cotea-k6-prometheus-data:
+  cotea-k6-grafana-data:

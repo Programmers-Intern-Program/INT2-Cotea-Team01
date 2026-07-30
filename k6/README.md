@@ -49,11 +49,46 @@ CONFIRM_LIVE=1 k6 run k6/load-hint-live.js
 | `THINK_TIME` | 스크립트별 | 요청 사이 sleep(초) |
 | `CONFIRM_LIVE` | 없음 | live 스크립트는 `1` 필수 |
 
+## Grafana로 그래프 보기 (Prometheus + Grafana)
+
+터미널 요약 외에 시계열 차트로 보려면 compose 스택을 띄운다.
+
+```bash
+# 1) Prometheus(9090) + Grafana(3000) 기동
+docker compose -f k6/docker-compose.yml up -d
+
+# 2) 브라우저
+#    Grafana  http://localhost:3000  (admin / admin)
+#    대시보드 "Cotea k6 Load Test" (폴더: Cotea k6)
+#    Prometheus http://localhost:9090
+
+# 3) 메트릭을 Prometheus로 보내며 k6 실행
+chmod +x k6/run-with-grafana.sh
+./k6/run-with-grafana.sh k6/smoke.js
+VUS=10 DURATION=30s ./k6/run-with-grafana.sh k6/load-recommend.js
+```
+
+직접 실행하려면:
+
+```bash
+K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write \
+K6_PROMETHEUS_RW_TREND_STATS='p(95),p(99),avg,min,max' \
+k6 run -o experimental-prometheus-rw k6/load-recommend.js
+```
+
+종료:
+
+```bash
+docker compose -f k6/docker-compose.yml down
+# 데이터까지 지우려면: docker compose -f k6/docker-compose.yml down -v
+```
+
 ## 권장 순서
 
 1. `smoke.js`로 연결 확인  
-2. `load-recommend.js` / `load-hint-dryrun.js`로 서버·DB 부하 측정  
-3. 필요할 때만 `CONFIRM_LIVE=1` live 스크립트 (VU·시간 최소화)
+2. (선택) compose up 후 Grafana 대시보드 열어두기  
+3. `load-recommend.js` / `load-hint-dryrun.js`로 서버·DB 부하 측정  
+4. 필요할 때만 `CONFIRM_LIVE=1` live 스크립트 (VU·시간 최소화)
 
 ## 해석 팁
 
@@ -61,3 +96,4 @@ CONFIRM_LIVE=1 k6 run k6/load-hint-live.js
 - dryRun 실패가 많으면 메타 로드/프롬프트 조립/DB 쪽을 의심
 - live만 느리면 LLM·네트워크 병목일 가능성이 큼
 - 운영 EC2에 강한 부하는 합의 후, VU를 낮게 시작
+- Grafana에서 그래프가 안 보이면: k6가 끝난 직후 시간 범위를 `Last 15 minutes`로 두고, Prometheus UI에서 `k6_http_reqs_total` 조회해 본다

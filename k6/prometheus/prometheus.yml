@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs: []
+# k6 → Prometheus remote write (/api/v1/write) 로 메트릭을 넣는다.
+# scrape 대상은 없어도 된다.
