@@ -7,6 +7,7 @@ import com.cotea.controller.dto.HintResponse;
 import com.cotea.exception.CoteaException;
 import com.cotea.service.learning.HintLogContext;
 import com.cotea.service.learning.LearningLogService;
+import com.cotea.service.learning.LearningLogService.SaveResult;
 import com.cotea.service.policy.PromptPolicyLoader;
 import com.cotea.service.problem.ProblemMetaService;
 import com.cotea.service.rag.RagChunk;
@@ -183,15 +184,7 @@ public class HintService {
             log.info("[FATAL_APPROACH] problemId={} fatal={}", request.getProblemId(), fatalApproach);
         }
 
-        HintResponse response = HintResponse.builder()
-                .responseText(responseText)
-                .route("RELATED")
-                .llmProvider("claude")
-                .stage(request.getStage())
-                .hintLevel(hintLevel)
-                .suggestConceptDrill(suggestConceptDrill)
-                .build();
-        learningLogService.saveIfAuthenticated(authorization, request, new HintLogContext(
+        SaveResult logSaveResult = learningLogService.saveIfAuthenticated(authorization, request, new HintLogContext(
                 policy,
                 problem,
                 problemContext,
@@ -200,7 +193,16 @@ public class HintService {
                 "RELATED",
                 "claude"
         ));
-        return response;
+        return HintResponse.builder()
+                .responseText(responseText)
+                .route("RELATED")
+                .llmProvider("claude")
+                .stage(request.getStage())
+                .hintLevel(hintLevel)
+                .suggestConceptDrill(suggestConceptDrill)
+                .reauthRequired(logSaveResult == SaveResult.REAUTH_REQUIRED)
+                .authMessage(authMessage(logSaveResult))
+                .build();
     }
 
     private HintResponse generateOffTopic(
@@ -246,14 +248,7 @@ public class HintService {
         );
 
         List<String> tags = problemContextSelector.extractTags(problem);
-        HintResponse response = HintResponse.builder()
-                .responseText(responseText)
-                .route("OFF_TOPIC")
-                .llmProvider(result.getLlmProvider())
-                .stage(request.getStage())
-                .hintLevel(hintLevel)
-                .build();
-        learningLogService.saveIfAuthenticated(authorization, request, new HintLogContext(
+        SaveResult logSaveResult = learningLogService.saveIfAuthenticated(authorization, request, new HintLogContext(
                 policy,
                 problem,
                 null,
@@ -262,7 +257,23 @@ public class HintService {
                 "OFF_TOPIC",
                 result.getLlmProvider()
         ));
-        return response;
+        return HintResponse.builder()
+                .responseText(responseText)
+                .route("OFF_TOPIC")
+                .llmProvider(result.getLlmProvider())
+                .stage(request.getStage())
+                .hintLevel(hintLevel)
+                .reauthRequired(logSaveResult == SaveResult.REAUTH_REQUIRED)
+                .authMessage(authMessage(logSaveResult))
+                .build();
+    }
+
+    private String authMessage(SaveResult saveResult) {
+        if (saveResult != SaveResult.REAUTH_REQUIRED) {
+            return null;
+        }
+        return "로그인 세션이 만료되어 이번 질문은 비로그인 상태로 처리됐어요. "
+                + "학습 리포트에 기록하려면 카카오 로그인을 다시 진행해주세요.";
     }
 
     private String applyGuardrailIfNeeded(

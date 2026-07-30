@@ -17,6 +17,10 @@ public class HintResponse {
     /** 개념/접근 자체가 부재한 것으로 판정되면 true — FE가 "관련 유형 문제 추천" 버튼 노출 */
     private final Boolean suggestConceptDrill;
 
+    /** 로그인 세션이 DB 사용자와 맞지 않아 이번 요청이 비로그인처럼 처리되었는지 */
+    private final Boolean reauthRequired;
+    private final String authMessage;
+
     /** RELATED | OFF_TOPIC — dryRun/관측용 */
     private final String route;
     /** claude | openai | claude_fallback — dryRun/관측용 */

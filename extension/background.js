@@ -284,12 +284,17 @@ async function requestHintFromApi(message) {
   }
 
   const data = await response.json();
+  if (data.reauthRequired) {
+    await setLocalState({ authState: null });
+  }
   return {
     answer: data.responseText || data.answer || data.message || '응답 본문에 responseText 필드가 없습니다.',
     source: 'api',
     hintLevel: data.hintLevel,
     stage: data.stage,
     suggestConceptDrill: Boolean(data.suggestConceptDrill),
+    reauthRequired: Boolean(data.reauthRequired),
+    authMessage: data.authMessage || '',
   };
 }
 

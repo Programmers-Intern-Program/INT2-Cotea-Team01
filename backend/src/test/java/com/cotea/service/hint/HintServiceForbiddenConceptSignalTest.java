@@ -7,6 +7,7 @@ import com.cotea.config.CoteaProperties;
 import com.cotea.controller.dto.HintRequest;
 import com.cotea.controller.dto.HintResponse;
 import com.cotea.service.auth.JwtTokenProvider;
+import com.cotea.service.auth.UserRepository;
 import com.cotea.service.learning.LearningLogService;
 import com.cotea.service.learning.UserHintLogRepository;
 import com.cotea.service.learning.WeaknessClassifier;
@@ -153,6 +154,7 @@ class HintServiceForbiddenConceptSignalTest {
                 new CoteaProperties(),
                 new LearningLogService(
                         Mockito.mock(JwtTokenProvider.class),
+                        Mockito.mock(UserRepository.class),
                         Mockito.mock(UserHintLogRepository.class),
                         Mockito.mock(WeaknessClassifier.class),
                         objectMapper
