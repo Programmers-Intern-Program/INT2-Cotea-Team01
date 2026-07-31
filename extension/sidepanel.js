@@ -629,7 +629,9 @@ function renderRichTextSegment(text) {
       if (!line) {
         return '<div class="text-gap"></div>';
       }
-      return `<p class="bubble-text-line">${line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')}</p>`;
+      const withBold = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      const withInlineCode = withBold.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+      return `<p class="bubble-text-line">${withInlineCode}</p>`;
     })
     .join('');
 }
