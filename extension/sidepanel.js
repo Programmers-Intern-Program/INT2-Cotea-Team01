@@ -622,16 +622,35 @@ function renderCodeBlock(code, highlightLine) {
   `;
 }
 
-function renderRichText(text) {
+function renderRichTextSegment(text) {
   return escapeHtml(text)
     .split('\n')
     .map((line) => {
       if (!line) {
         return '<div class="text-gap"></div>';
       }
-      return `<p class="bubble-text-line">${line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')}</p>`;
+      const withBold = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      const withInlineCode = withBold.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+      return `<p class="bubble-text-line">${withInlineCode}</p>`;
     })
     .join('');
+}
+
+function renderRichText(text) {
+  const fencePattern = /```\w*\n?([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let html = '';
+  let match;
+  while ((match = fencePattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      html += renderRichTextSegment(text.slice(lastIndex, match.index));
+    }
+    const code = match[1].replace(/\n$/, '').split('\n').map(tokenize).join('\n');
+    html += `<pre class="inline-code-block"><code>${code}</code></pre>`;
+    lastIndex = match.index + match[0].length;
+  }
+  html += renderRichTextSegment(text.slice(lastIndex));
+  return html;
 }
 
 function renderMessage(message) {
