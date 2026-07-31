@@ -622,7 +622,7 @@ function renderCodeBlock(code, highlightLine) {
   `;
 }
 
-function renderRichText(text) {
+function renderRichTextSegment(text) {
   return escapeHtml(text)
     .split('\n')
     .map((line) => {
@@ -632,6 +632,22 @@ function renderRichText(text) {
       return `<p class="bubble-text-line">${line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')}</p>`;
     })
     .join('');
+}
+
+function renderRichText(text) {
+  const fencePattern = /```\w*\n?([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let html = '';
+  let match;
+  while ((match = fencePattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      html += renderRichTextSegment(text.slice(lastIndex, match.index));
+    }
+    html += `<pre class="inline-code-block"><code>${escapeHtml(match[1].replace(/\n$/, ''))}</code></pre>`;
+    lastIndex = match.index + match[0].length;
+  }
+  html += renderRichTextSegment(text.slice(lastIndex));
+  return html;
 }
 
 function renderMessage(message) {
