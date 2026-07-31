@@ -190,14 +190,14 @@ button {
 .inline-code-block {
   margin: 6px 0;
   padding: 10px 12px;
-  overflow-x: auto;
   border-radius: 8px;
   background: #1e1e2e;
   color: #d4d4dc;
   font-family: Consolas, Menlo, monospace;
   font-size: 11.5px;
   line-height: 1.6;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .message-time {

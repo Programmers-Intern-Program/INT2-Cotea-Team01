@@ -643,7 +643,8 @@ function renderRichText(text) {
     if (match.index > lastIndex) {
       html += renderRichTextSegment(text.slice(lastIndex, match.index));
     }
-    html += `<pre class="inline-code-block"><code>${escapeHtml(match[1].replace(/\n$/, ''))}</code></pre>`;
+    const code = match[1].replace(/\n$/, '').split('\n').map(tokenize).join('\n');
+    html += `<pre class="inline-code-block"><code>${code}</code></pre>`;
     lastIndex = match.index + match[0].length;
   }
   html += renderRichTextSegment(text.slice(lastIndex));
